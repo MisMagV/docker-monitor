@@ -148,7 +148,7 @@ func (s *Service) Upkeep() {
 
 func (s *Service) Update() {
 	Sched.Cancel(s.jobId)
-	log.WithFields(log.Fields{"ID": s.Id[:12], "srv": s.Srv, "ttl": s.TTL}).Info("update")
+	log.WithFields(log.Fields{"ID": s.Id[:12], "srv": s.Srv, "heartbeat": s.Hb, "ttl": s.TTL}).Info("update")
 	MakeService(s)
 }
 
