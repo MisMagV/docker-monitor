@@ -1,21 +1,13 @@
 package main
 
 import (
-	api "github.com/jeffjen/docker-monitor/api"
 	disc "github.com/jeffjen/docker-monitor/discovery"
-	up "github.com/jeffjen/docker-monitor/upkeep"
 
 	log "github.com/Sirupsen/logrus"
 	cli "github.com/codegangsta/cli"
-	docker "github.com/fsouza/go-dockerclient"
 
 	"os"
 	"time"
-)
-
-var (
-	Advertise string
-	DCli      *docker.Client
 )
 
 func main() {
@@ -44,25 +36,13 @@ func main() {
 			Name:  "addr",
 			Usage: "API endpoint for admin",
 		},
+		cli.BoolFlag{
+			Name:  "idle",
+			Usage: "Set flag to disable active container life cycle event",
+		},
 	}
 	app.Action = Monitor
 	app.Run(os.Args)
-}
-
-func runAPIEndpoint(c *cli.Context) {
-	var (
-		server = api.GetServer()
-		addr   = c.String("addr")
-	)
-	if addr == "" {
-		log.Warning("API endpoint disabled")
-		return
-	}
-	go func() {
-		server.Addr = addr
-		log.WithFields(log.Fields{"addr": addr}).Info("API endpoint begin")
-		log.Fatal(server.ListenAndServe())
-	}()
 }
 
 func check(c *cli.Context) {
@@ -73,8 +53,6 @@ func check(c *cli.Context) {
 		heartbeat time.Duration
 		ttl       time.Duration
 	)
-
-	runAPIEndpoint(c)
 
 	if disc.Advertise = c.String("advertise"); disc.Advertise == "" {
 		cli.ShowAppHelp(c)
@@ -115,75 +93,30 @@ func check(c *cli.Context) {
 func Monitor(ctx *cli.Context) {
 	check(ctx)
 
-	if d, err := docker.NewClientFromEnv(); err != nil {
-		log.Fatal(err)
-	} else {
-		DCli = d
-	}
-
-	// docker daemon event source
-	src := make(chan *docker.APIEvents, 8)
-
-	// setup signal handler to gracefully quit
-	HandleSignal(DCli, src)
-
-	if err := DCli.AddEventListener(src); err != nil {
-		log.Fatal(err)
-	} else {
-		defer DCli.RemoveEventListener(src)
-	}
-
-	for event := range src {
-		switch event.Status {
-		case "start":
-			go NewRecord(event.ID)
-			break
-		case "die":
-			go up.ServiceStop(event.ID)
-			break
-		case "destroy":
-			go up.ServiceDie(event.ID)
-			break
-		}
-	}
-}
-
-func NewRecord(iden string) {
-	if s := up.Get(iden); s != nil {
-		if s.Running() {
-			s.Stop()
-			log.WithFields(log.Fields{"ID": s.Id[:12], "srv": s.Srv}).Warning("inconsistent record")
-		}
-		s.Start()
-		return
-	}
-
-	info, _ := DCli.InspectContainer(iden)
-
 	var (
-		Srv  = info.Config.Labels["service"]
-		Net  = info.NetworkSettings.PortMappingAPI()
-		Port = info.Config.Labels["port"]
+		addr = ctx.String("addr")
+		idle = ctx.Bool("idle")
 
-		Heartbeat time.Duration
-		TTL       time.Duration
+		stop = make(chan struct{}, 1)
 	)
 
-	if !up.Validate(iden, Srv, Port, Net) {
-		return
-	}
-
-	if hbStr := info.Config.Labels["heartbeat"]; hbStr == "" {
-		Heartbeat = 2 * time.Minute
+	if addr != "" {
+		log.WithFields(log.Fields{"addr": addr}).Info("API endpoint begin")
+		go runAPIEndpoint(addr, stop)
 	} else {
-		Heartbeat = up.ParseHearbeat(hbStr)
+		log.Warning("API endpoint disabled")
 	}
 
-	if ttlStr := info.Config.Labels["ttl"]; ttlStr == "" {
-		TTL = 2*time.Minute + 30*time.Second
+	if !idle {
+		log.WithFields(log.Fields{"addr": os.Getenv("DOCKER_HOST")}).Info("Track container life cycle")
+		go runDockerEvent(stop)
 	} else {
-		TTL = up.ParseTTL(ttlStr)
+		log.Warning("docker event endpoint disabled")
 	}
 
-	up.NewService(Heartbeat, TTL, iden, Srv, info)
+	if addr != "" || !idle {
+		<-stop // we should never reach pass this point
+	} else {
+		log.Warning("nothing to do; quit now")
+	}
 }
