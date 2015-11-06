@@ -1,6 +1,7 @@
 package main
 
 import (
+	api "github.com/jeffjen/docker-monitor/api"
 	disc "github.com/jeffjen/docker-monitor/discovery"
 	up "github.com/jeffjen/docker-monitor/upkeep"
 
@@ -39,9 +40,29 @@ func main() {
 			Value: "90s",
 			Usage: "Expire time for which montior is considered offline",
 		},
+		cli.StringFlag{
+			Name:  "addr",
+			Usage: "API endpoint for admin",
+		},
 	}
 	app.Action = Monitor
 	app.Run(os.Args)
+}
+
+func runAPIEndpoint(c *cli.Context) {
+	var (
+		server = api.GetServer()
+		addr   = c.String("addr")
+	)
+	if addr == "" {
+		log.Warning("API endpoint disabled")
+		return
+	}
+	go func() {
+		server.Addr = addr
+		log.WithFields(log.Fields{"addr": addr}).Info("API endpoint begin")
+		log.Fatal(server.ListenAndServe())
+	}()
 }
 
 func check(c *cli.Context) {
@@ -52,6 +73,8 @@ func check(c *cli.Context) {
 		heartbeat time.Duration
 		ttl       time.Duration
 	)
+
+	runAPIEndpoint(c)
 
 	if disc.Advertise = c.String("advertise"); disc.Advertise == "" {
 		cli.ShowAppHelp(c)
@@ -146,45 +169,20 @@ func NewRecord(iden string) {
 		TTL       time.Duration
 	)
 
-	if Srv == "" {
-		log.WithFields(log.Fields{"ID": iden}).Warning("not tracking container")
+	if !up.Validate(iden, Srv, Port, Net) {
 		return
-	}
-	if Port == "" {
-		if len(Net) == 0 {
-			log.WithFields(log.Fields{"ID": iden}).Warning("not tracking container")
-			return
-		}
-		open := 0
-		for _, net := range Net {
-			if net.PublicPort != 0 {
-				open += 1
-			}
-		}
-		if open == 0 {
-			log.WithFields(log.Fields{"ID": iden}).Warning("not tracking container")
-			return
-		}
 	}
 
 	if hbStr := info.Config.Labels["heartbeat"]; hbStr == "" {
-		Heartbeat = 1 * time.Hour
+		Heartbeat = 2 * time.Minute
 	} else {
-		if hb, err := time.ParseDuration(hbStr); err != nil {
-			Heartbeat = 1 * time.Hour
-		} else {
-			Heartbeat = hb
-		}
+		Heartbeat = up.ParseHearbeat(hbStr)
 	}
 
 	if ttlStr := info.Config.Labels["ttl"]; ttlStr == "" {
-		TTL = 1*time.Hour + 30*time.Second
+		TTL = 2*time.Minute + 30*time.Second
 	} else {
-		if t, err := time.ParseDuration(ttlStr); err != nil {
-			TTL = 1*time.Hour + 30*time.Second
-		} else {
-			TTL = t
-		}
+		TTL = up.ParseTTL(ttlStr)
 	}
 
 	up.NewService(Heartbeat, TTL, iden, Srv, info)

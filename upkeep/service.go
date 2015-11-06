@@ -22,6 +22,67 @@ var (
 	rec = libkv.NewStore()
 )
 
+func ParseHearbeat(s string) time.Duration {
+	if hb, err := time.ParseDuration(s); err != nil {
+		return 2 * time.Minute
+	} else {
+		return hb
+	}
+}
+
+func ParseTTL(s string) time.Duration {
+	if ttl, err := time.ParseDuration(s); err != nil {
+		return 2*time.Minute + 30*time.Second
+	} else {
+		return ttl
+	}
+}
+
+func Validate(iden, srv, port string, network []docker.APIPort) bool {
+	if srv == "" {
+		log.WithFields(log.Fields{"ID": iden}).Warning("not tracking: service")
+		return false
+	}
+	if port == "" {
+		if len(network) == 0 {
+			log.WithFields(log.Fields{"ID": iden}).Warning("not tracking: port")
+			return false
+		}
+		open := 0
+		for _, net := range network {
+			if net.PublicPort != 0 {
+				open += 1
+			}
+		}
+		if open == 0 {
+			log.WithFields(log.Fields{"ID": iden}).Warning("not tracking: port")
+			return false
+		}
+	}
+	return true
+}
+
+func MakeService(s *Service) {
+	if port := s.C.Config.Labels["port"]; port == "" {
+		key := make([]string, 0)
+		net := s.C.NetworkSettings.PortMappingAPI()
+		for _, p := range net {
+			if p.PublicPort != 0 {
+				key = append(key, fmt.Sprintf("%s:%d", disc.Advertise, p.PublicPort))
+			}
+		}
+		s.key = path.Join(s.Srv, strings.Join(key, ","))
+	} else {
+		s.key = path.Join(s.Srv, fmt.Sprintf("%s:%s", disc.Advertise, port))
+	}
+
+	s.opts = &etcd.SetOptions{TTL: s.TTL}
+
+	if rec.Set(s.Id, s) {
+		s.Start()
+	}
+}
+
 func NewService(heartbeat, ttl time.Duration, iden, service string, container *docker.Container) (s *Service) {
 	s = &Service{
 		Hb:  heartbeat,
@@ -30,29 +91,7 @@ func NewService(heartbeat, ttl time.Duration, iden, service string, container *d
 		Srv: service,
 		C:   container,
 	}
-
-	if port := container.Config.Labels["port"]; port == "" {
-		key := make([]string, 0)
-		net := container.NetworkSettings.PortMappingAPI()
-		for _, p := range net {
-			if p.PublicPort != 0 {
-				key = append(key, fmt.Sprintf("%s:%s:%d", p.Type, disc.Advertise, p.PublicPort))
-			}
-		}
-		s.key = path.Join(service, strings.Join(key, ","))
-	} else {
-		scheme := container.Config.Labels["scheme"]
-		if scheme == "" {
-			scheme = "tcp"
-		}
-		s.key = path.Join(service, fmt.Sprintf("%s:%s:%s", scheme, disc.Advertise, port))
-	}
-
-	s.opts = &etcd.SetOptions{TTL: ttl}
-
-	if rec.Set(iden, s) {
-		s.Start()
-	}
+	MakeService(s)
 	return
 }
 
@@ -80,18 +119,18 @@ func Get(iden string) (s *Service) {
 }
 
 type Service struct {
-	Hb  time.Duration
-	TTL time.Duration
+	Hb  time.Duration `json: "Heartbeat"`
+	TTL time.Duration `json: "TTL"`
 
-	Id  string
-	Srv string
-	C   *docker.Container
+	Id  string            `json: "ContainerID"`
+	Srv string            `json: "Service"`
+	C   *docker.Container `json:-`
 
-	jobId int64 // required info for cancel
+	kAPI etcd.KeysAPI     `json:-`
+	key  string           `json:-`
+	opts *etcd.SetOptions `json:-`
 
-	kAPI etcd.KeysAPI // for recored upkeep
-	key  string
-	opts *etcd.SetOptions
+	jobId int64 `json:-`
 }
 
 func (s *Service) Done(jobId int64) {
@@ -107,9 +146,16 @@ func (s *Service) Upkeep() {
 	}
 }
 
+func (s *Service) Update() {
+	Sched.Cancel(s.jobId)
+	log.WithFields(log.Fields{"ID": s.Id[:12], "srv": s.Srv, "ttl": s.TTL}).Info("update")
+	MakeService(s)
+}
+
 func (s *Service) Start() {
 	s.kAPI = etcd.NewKeysAPI(disc.NewDiscovery())
 	s.Upkeep()
+	s.opts.PrevExist = etcd.PrevExist
 	s.jobId = Sched.Repeat(s.Hb, 1, s)
 }
 
@@ -117,6 +163,7 @@ func (s *Service) Stop() {
 	Sched.Cancel(s.jobId)
 	s.kAPI = nil
 	s.jobId = -1
+	s.opts.PrevExist = etcd.PrevIgnore
 	log.WithFields(log.Fields{"ID": s.Id[:12], "srv": s.Srv, "ttl": s.TTL}).Info("down")
 }
 

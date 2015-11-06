@@ -41,6 +41,11 @@ func NewDiscovery() (client etcd.Client) {
 	return
 }
 
+func upkeep(kAPI etcd.KeysAPI, iden string, opts *etcd.SetOptions) (err error) {
+	_, err = kAPI.Set(ctx.Background(), iden, "", opts)
+	return
+}
+
 func Register(heartbeat time.Duration, ttl time.Duration) {
 	// begin book keeping "THIS" montior unit
 	go func() {
@@ -56,15 +61,18 @@ func Register(heartbeat time.Duration, ttl time.Duration) {
 		defer t.Stop()
 
 		// Allow for implicit bootstrap on register
-		kAPI.Set(ctx.Background(), RegisterPath, "", &etcd.SetOptions{
-			PrevExist: etcd.PrevNoExist,
-			Dir:       true,
-		})
+		if err := upkeep(kAPI, iden, &opts); err != nil {
+			log.Error(err)
+		} else {
+			log.WithFields(f).Info("uptime")
+		}
+
+		// only update key TTL
+		opts.PrevExist = etcd.PrevExist
 
 		// Tick... Toc...
 		for _ = range t.C {
-			_, err := kAPI.Set(ctx.Background(), iden, "", &opts)
-			if err != nil {
+			if err := upkeep(kAPI, iden, &opts); err != nil {
 				log.Error(err)
 			} else {
 				log.WithFields(f).Info("uptime")
