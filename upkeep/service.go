@@ -16,6 +16,11 @@ import (
 	"time"
 )
 
+const (
+	DEFAULT_HEARTBEAT = 2 * time.Minute
+	DEFAULT_TTL       = 2*time.Minute + 5*time.Second
+)
+
 var (
 	Sched = timer.NewTimer()
 

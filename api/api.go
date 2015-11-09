@@ -90,13 +90,13 @@ func register(w http.ResponseWriter, r *http.Request, args []string) {
 	}
 
 	if hbStr := r.Form.Get("hb"); hbStr == "" {
-		Heartbeat = 2 * time.Minute
+		Heartbeat = up.DEFAULT_HEARTBEAT
 	} else {
 		Heartbeat = up.ParseHearbeat(hbStr)
 	}
 
 	if ttlStr := r.Form.Get("ttl"); ttlStr == "" {
-		TTL = 2*time.Minute + 30*time.Second
+		TTL = up.DEFAULT_TTL
 	} else {
 		TTL = up.ParseTTL(ttlStr)
 	}

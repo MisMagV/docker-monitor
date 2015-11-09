@@ -75,13 +75,13 @@ func newRecord(iden string) {
 	}
 
 	if hbStr := info.Config.Labels["heartbeat"]; hbStr == "" {
-		Heartbeat = 2 * time.Minute
+		Heartbeat = up.DEFAULT_HEARTBEAT
 	} else {
 		Heartbeat = up.ParseHearbeat(hbStr)
 	}
 
 	if ttlStr := info.Config.Labels["ttl"]; ttlStr == "" {
-		TTL = 2*time.Minute + 30*time.Second
+		TTL = up.DEFAULT_TTL
 	} else {
 		TTL = up.ParseTTL(ttlStr)
 	}
