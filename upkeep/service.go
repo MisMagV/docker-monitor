@@ -31,22 +31,32 @@ var (
 	rec *libkv.Store
 )
 
-func Init() {
+func sync(jobId int64) {
+	if err := rec.Save(DEFAULT_SYNC_PATH); err != nil {
+		log.Warningf("unable to persist: %v", err)
+	} else {
+		log.Infof("persist: %v", DEFAULT_SYNC_PATH)
+	}
+}
+
+func Init(persist bool) {
 	var err error
 
 	Sched = timer.NewTimer()
 
 	Sched.Tic() // start the scheduler, don't ever stop
 
-	if rec, err = libkv.Load(DEFAULT_SYNC_PATH); err != nil {
-		log.Warningf("unable to load: %v", err)
+	if persist {
+		if rec, err = libkv.Load(DEFAULT_SYNC_PATH); err != nil {
+			log.Warningf("unable to load: %v", err)
+		}
+		for _, k := range rec.Key() {
+			MakeService(rec.Get(k).(*Service))
+		}
+		Sched.RepeatFunc(DEFAULT_SYNC_CYCLE, 1, sync)
+	} else {
+		rec = libkv.NewStore()
 	}
-
-	for _, k := range rec.Key() {
-		MakeService(rec.Get(k).(*Service))
-	}
-
-	Sched.RepeatFunc(DEFAULT_SYNC_CYCLE, 1, sync)
 }
 
 func ParseHearbeat(s string) time.Duration {
@@ -197,14 +207,6 @@ func (s *Service) Stop() {
 
 func (s *Service) Running() bool {
 	return s.jobId != -1
-}
-
-func sync(jobId int64) {
-	if err := rec.Save(DEFAULT_SYNC_PATH); err != nil {
-		log.Warningf("unable to persist: %v", err)
-	} else {
-		log.Infof("persist: %v", DEFAULT_SYNC_PATH)
-	}
 }
 
 func init() {

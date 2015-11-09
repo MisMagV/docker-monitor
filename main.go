@@ -41,6 +41,10 @@ func main() {
 			Name:  "idle",
 			Usage: "Set flag to disable active container life cycle event",
 		},
+		cli.BoolFlag{
+			Name:  "persist",
+			Usage: "Experimental: Set flag to persist data",
+		},
 	}
 	app.Action = Monitor
 	app.Run(os.Args)
@@ -95,14 +99,15 @@ func Monitor(ctx *cli.Context) {
 	check(ctx)
 
 	var (
-		addr = ctx.String("addr")
-		idle = ctx.Bool("idle")
+		addr    = ctx.String("addr")
+		idle    = ctx.Bool("idle")
+		persist = ctx.Bool("persist")
 
 		stop = make(chan struct{}, 1)
 	)
 
 	// setup service upkeep
-	up.Init()
+	up.Init(persist)
 
 	if addr != "" {
 		log.WithFields(log.Fields{"addr": addr}).Info("API endpoint begin")
