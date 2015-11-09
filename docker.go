@@ -1,10 +1,10 @@
 package main
 
 import (
-	docker "github.com/fsouza/go-dockerclient"
 	up "github.com/jeffjen/docker-monitor/upkeep"
 
 	log "github.com/Sirupsen/logrus"
+	docker "github.com/fsouza/go-dockerclient"
 
 	"time"
 )
@@ -86,5 +86,5 @@ func newRecord(iden string) {
 		TTL = up.ParseTTL(ttlStr)
 	}
 
-	up.NewService(Heartbeat, TTL, iden, Srv, Port, info)
+	up.NewService(Heartbeat, TTL, iden, Srv, Port, Net)
 }

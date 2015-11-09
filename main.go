@@ -2,6 +2,7 @@ package main
 
 import (
 	disc "github.com/jeffjen/docker-monitor/discovery"
+	up "github.com/jeffjen/docker-monitor/upkeep"
 
 	log "github.com/Sirupsen/logrus"
 	cli "github.com/codegangsta/cli"
@@ -99,6 +100,9 @@ func Monitor(ctx *cli.Context) {
 
 		stop = make(chan struct{}, 1)
 	)
+
+	// setup service upkeep
+	up.Init()
 
 	if addr != "" {
 		log.WithFields(log.Fields{"addr": addr}).Info("API endpoint begin")

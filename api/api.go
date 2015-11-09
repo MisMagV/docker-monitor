@@ -101,7 +101,7 @@ func register(w http.ResponseWriter, r *http.Request, args []string) {
 		TTL = up.ParseTTL(ttlStr)
 	}
 
-	up.NewService(Heartbeat, TTL, info.ID, Srv, Port, info)
+	up.NewService(Heartbeat, TTL, info.ID, Srv, Port, Net)
 
 	w.Write([]byte("ok"))
 }

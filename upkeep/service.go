@@ -10,6 +10,7 @@ import (
 	docker "github.com/fsouza/go-dockerclient"
 	ctx "golang.org/x/net/context"
 
+	"encoding/gob"
 	"fmt"
 	"path"
 	"strings"
@@ -19,13 +20,34 @@ import (
 const (
 	DEFAULT_HEARTBEAT = 2 * time.Minute
 	DEFAULT_TTL       = 2*time.Minute + 5*time.Second
+
+	DEFAULT_SYNC_PATH  = "/tmp"
+	DEFAULT_SYNC_CYCLE = 2 * time.Minute
 )
 
 var (
+	Sched *timer.Timer
+
+	rec *libkv.Store
+)
+
+func Init() {
+	var err error
+
 	Sched = timer.NewTimer()
 
-	rec = libkv.NewStore()
-)
+	Sched.Tic() // start the scheduler, don't ever stop
+
+	if rec, err = libkv.Load(DEFAULT_SYNC_PATH); err != nil {
+		log.Warningf("unable to load: %v", err)
+	}
+
+	for _, k := range rec.Key() {
+		MakeService(rec.Get(k).(*Service))
+	}
+
+	Sched.RepeatFunc(DEFAULT_SYNC_CYCLE, 1, sync)
+}
 
 func ParseHearbeat(s string) time.Duration {
 	if hb, err := time.ParseDuration(s); err != nil {
@@ -68,18 +90,15 @@ func Validate(iden, srv, port string, network []docker.APIPort) bool {
 }
 
 func MakeService(s *Service) {
-	if net := s.C.NetworkSettings.PortMappingAPI(); len(net) > 0 {
+	if len(s.Net) > 0 {
 		key := make([]string, 0)
-		for _, p := range net {
+		for _, p := range s.Net {
 			if p.PublicPort != 0 {
 				key = append(key, fmt.Sprintf("%s:%d", disc.Advertise, p.PublicPort))
 			}
 		}
 		s.key = path.Join(s.Srv, strings.Join(key, ","))
-	} else if port := s.C.Config.Labels["port"]; port != "" {
-		s.Port = port
-		s.key = path.Join(s.Srv, fmt.Sprintf("%s:%s", disc.Advertise, s.Port))
-	} else {
+	} else if s.Port != "" {
 		s.key = path.Join(s.Srv, fmt.Sprintf("%s:%s", disc.Advertise, s.Port))
 	}
 
@@ -90,14 +109,14 @@ func MakeService(s *Service) {
 	}
 }
 
-func NewService(heartbeat, ttl time.Duration, iden, service, port string, container *docker.Container) (s *Service) {
+func NewService(heartbeat, ttl time.Duration, iden, service, port string, net []docker.APIPort) (s *Service) {
 	s = &Service{
 		Hb:   heartbeat,
 		TTL:  ttl,
 		Id:   iden,
 		Srv:  service,
 		Port: port,
-		C:    container,
+		Net:  net,
 	}
 	MakeService(s)
 	return
@@ -130,10 +149,10 @@ type Service struct {
 	Hb  time.Duration `json: "Heartbeat"`
 	TTL time.Duration `json: "TTL"`
 
-	Id   string            `json: "ContainerID"`
-	Srv  string            `json: "Service"`
-	Port string            `json: "Port"`
-	C    *docker.Container `json:-`
+	Id   string           `json: "ContainerID"`
+	Srv  string           `json: "Service"`
+	Port string           `json: "Port"`
+	Net  []docker.APIPort `json: "Net"`
 
 	kAPI etcd.KeysAPI     `json:-`
 	key  string           `json:-`
@@ -180,6 +199,15 @@ func (s *Service) Running() bool {
 	return s.jobId != -1
 }
 
+func sync(jobId int64) {
+	if err := rec.Save(DEFAULT_SYNC_PATH); err != nil {
+		log.Warningf("unable to persist: %v", err)
+	} else {
+		log.Infof("persist: %v", DEFAULT_SYNC_PATH)
+	}
+}
+
 func init() {
-	Sched.Tic() // start the scheduler, don't ever stop
+	gob.Register(&Service{})
+	gob.Register([]docker.APIPort{})
 }
