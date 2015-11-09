@@ -76,7 +76,7 @@ func MakeService(s *Service) {
 			}
 		}
 		s.key = path.Join(s.Srv, strings.Join(key, ","))
-	} else if port := s.C.Config.Labels["port"]; port == "" {
+	} else if port := s.C.Config.Labels["port"]; port != "" {
 		s.Port = port
 		s.key = path.Join(s.Srv, fmt.Sprintf("%s:%s", disc.Advertise, s.Port))
 	} else {
