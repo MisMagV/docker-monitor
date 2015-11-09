@@ -101,7 +101,7 @@ func register(w http.ResponseWriter, r *http.Request, args []string) {
 		TTL = up.ParseTTL(ttlStr)
 	}
 
-	up.NewService(Heartbeat, TTL, info.ID, Srv, info)
+	up.NewService(Heartbeat, TTL, info.ID, Srv, Port, info)
 
 	w.Write([]byte("ok"))
 }
@@ -121,6 +121,10 @@ func update(w http.ResponseWriter, r *http.Request, args []string) {
 
 	if srv := r.Form.Get("srv"); srv != "" {
 		service.Srv = srv
+	}
+
+	if port := r.Form.Get("port"); port != "" {
+		service.Port = port
 	}
 
 	if hbStr := r.Form.Get("hb"); hbStr != "" {

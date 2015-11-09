@@ -63,17 +63,19 @@ func Validate(iden, srv, port string, network []docker.APIPort) bool {
 }
 
 func MakeService(s *Service) {
-	if port := s.C.Config.Labels["port"]; port == "" {
+	if net := s.C.NetworkSettings.PortMappingAPI(); len(net) > 0 {
 		key := make([]string, 0)
-		net := s.C.NetworkSettings.PortMappingAPI()
 		for _, p := range net {
 			if p.PublicPort != 0 {
 				key = append(key, fmt.Sprintf("%s:%d", disc.Advertise, p.PublicPort))
 			}
 		}
 		s.key = path.Join(s.Srv, strings.Join(key, ","))
+	} else if port := s.C.Config.Labels["port"]; port == "" {
+		s.Port = port
+		s.key = path.Join(s.Srv, fmt.Sprintf("%s:%s", disc.Advertise, s.Port))
 	} else {
-		s.key = path.Join(s.Srv, fmt.Sprintf("%s:%s", disc.Advertise, port))
+		s.key = path.Join(s.Srv, fmt.Sprintf("%s:%s", disc.Advertise, s.Port))
 	}
 
 	s.opts = &etcd.SetOptions{TTL: s.TTL}
@@ -83,13 +85,14 @@ func MakeService(s *Service) {
 	}
 }
 
-func NewService(heartbeat, ttl time.Duration, iden, service string, container *docker.Container) (s *Service) {
+func NewService(heartbeat, ttl time.Duration, iden, service, port string, container *docker.Container) (s *Service) {
 	s = &Service{
-		Hb:  heartbeat,
-		TTL: ttl,
-		Id:  iden,
-		Srv: service,
-		C:   container,
+		Hb:   heartbeat,
+		TTL:  ttl,
+		Id:   iden,
+		Srv:  service,
+		Port: port,
+		C:    container,
 	}
 	MakeService(s)
 	return
@@ -122,9 +125,10 @@ type Service struct {
 	Hb  time.Duration `json: "Heartbeat"`
 	TTL time.Duration `json: "TTL"`
 
-	Id  string            `json: "ContainerID"`
-	Srv string            `json: "Service"`
-	C   *docker.Container `json:-`
+	Id   string            `json: "ContainerID"`
+	Srv  string            `json: "Service"`
+	Port string            `json: "Port"`
+	C    *docker.Container `json:-`
 
 	kAPI etcd.KeysAPI     `json:-`
 	key  string           `json:-`
@@ -148,7 +152,7 @@ func (s *Service) Upkeep() {
 
 func (s *Service) Update() {
 	Sched.Cancel(s.jobId)
-	log.WithFields(log.Fields{"ID": s.Id[:12], "srv": s.Srv, "heartbeat": s.Hb, "ttl": s.TTL}).Info("update")
+	log.WithFields(log.Fields{"ID": s.Id[:12]}).Info("update")
 	MakeService(s)
 }
 

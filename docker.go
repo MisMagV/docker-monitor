@@ -86,5 +86,5 @@ func newRecord(iden string) {
 		TTL = up.ParseTTL(ttlStr)
 	}
 
-	up.NewService(Heartbeat, TTL, iden, Srv, info)
+	up.NewService(Heartbeat, TTL, iden, Srv, Port, info)
 }
