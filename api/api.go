@@ -68,6 +68,7 @@ func register(w http.ResponseWriter, r *http.Request, args []string) {
 	info, err := common("POST", r, args)
 	if err != nil {
 		http.Error(w, "Method not allowed", 403)
+		return
 	}
 
 	if s := up.Get(info.ID); s != nil {
