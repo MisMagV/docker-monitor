@@ -1,4 +1,4 @@
-package main
+package cmd
 
 import (
 	up "github.com/jeffjen/docker-monitor/upkeep"
@@ -10,7 +10,7 @@ import (
 )
 
 var (
-	DCli *docker.Client
+	dCli *docker.Client
 )
 
 func runDockerEvent(stop chan<- struct{}) {
@@ -19,19 +19,16 @@ func runDockerEvent(stop chan<- struct{}) {
 	if d, err := docker.NewClientFromEnv(); err != nil {
 		log.Fatal(err)
 	} else {
-		DCli = d
+		dCli = d
 	}
 
 	// docker daemon event source
 	src := make(chan *docker.APIEvents, 8)
 
-	// setup signal handler to gracefully quit
-	HandleSignal(DCli, src)
-
-	if err := DCli.AddEventListener(src); err != nil {
+	if err := dCli.AddEventListener(src); err != nil {
 		log.Fatal(err)
 	} else {
-		defer DCli.RemoveEventListener(src)
+		defer dCli.RemoveEventListener(src)
 	}
 
 	for event := range src {
@@ -59,7 +56,7 @@ func newRecord(iden string) {
 		return
 	}
 
-	info, _ := DCli.InspectContainer(iden)
+	info, _ := dCli.InspectContainer(iden)
 
 	var (
 		Srv  = info.Config.Labels["service"]

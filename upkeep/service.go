@@ -2,6 +2,7 @@ package upkeep
 
 import (
 	disc "github.com/jeffjen/docker-monitor/discovery"
+	d "github.com/jeffjen/docker-monitor/driver"
 	"github.com/jeffjen/go-libkv/libkv"
 	timer "github.com/jeffjen/go-libkv/timer"
 
@@ -29,6 +30,8 @@ var (
 	Sched *timer.Timer
 
 	rec *libkv.Store
+
+	AllocDriver func(string) (d.Driver, error) = nil
 )
 
 func sync(jobId int64) {
@@ -39,8 +42,16 @@ func sync(jobId int64) {
 	}
 }
 
+func noop(string) (d.Driver, error) {
+	return &d.Noop{}, nil
+}
+
 func Init(persist bool) {
 	var err error
+
+	if AllocDriver == nil {
+		AllocDriver = noop // default safety net for driver maker
+	}
 
 	Sched = timer.NewTimer()
 
@@ -100,6 +111,8 @@ func Validate(iden, srv, port string, network []docker.APIPort) bool {
 }
 
 func MakeService(s *Service) {
+	s.f = log.Fields{"ID": s.Id[:12], "srv": s.Srv, "heartbeat": s.Hb, "ttl": s.TTL}
+
 	if len(s.Net) > 0 {
 		key := make([]string, 0)
 		for _, p := range s.Net {
@@ -107,7 +120,12 @@ func MakeService(s *Service) {
 				key = append(key, fmt.Sprintf("%s:%d", disc.Advertise, p.PublicPort))
 			}
 		}
-		s.key = path.Join(s.Srv, strings.Join(key, ","))
+		if len(key) == 1 {
+			s.key = path.Join(s.Srv, strings.Join(key, ","))
+		} else {
+			log.WithFields(log.Fields{"ID": s.Id[:12]}).Warning("refuse; 0 or too many port")
+			return
+		}
 	} else if s.Port != "" {
 		s.key = path.Join(s.Srv, fmt.Sprintf("%s:%s", disc.Advertise, s.Port))
 	}
@@ -169,40 +187,77 @@ type Service struct {
 	opts *etcd.SetOptions `json:-`
 
 	jobId int64 `json:-`
+
+	f log.Fields `json:-`
+
+	driver d.Driver `json:-`
+	fail   int      `json:-`
 }
 
 func (s *Service) Done(jobId int64) {
-	s.Upkeep()
+	if s.Probe() != nil {
+		s.fail += 1
+		log.WithFields(s.f).Warning("probe missed")
+		return
+	}
+	if s.fail > 3 {
+		s.Stop()
+		return
+	} else {
+		s.fail = 0
+		s.Upkeep()
+	}
+}
+
+func (s *Service) Probe() error {
+	return s.driver.Probe()
 }
 
 func (s *Service) Upkeep() {
-	f := log.Fields{"ID": s.Id[:12], "srv": s.Srv, "heartbeat": s.Hb, "ttl": s.TTL}
 	if _, err := s.kAPI.Set(ctx.Background(), s.key, s.Id, s.opts); err != nil {
-		log.WithFields(f).Warning(err)
+		log.WithFields(s.f).Warning(err)
 	} else {
-		log.WithFields(f).Info("up")
+		log.WithFields(s.f).Info("up")
 	}
 }
 
 func (s *Service) Update() {
 	Sched.Cancel(s.jobId)
-	log.WithFields(log.Fields{"ID": s.Id[:12]}).Info("update")
+	log.WithFields(s.f).Info("update")
 	MakeService(s)
 }
 
 func (s *Service) Start() {
+	// FIXME: we probably need a allow specific port for probing
+	s.driver, _ = AllocDriver(path.Base(s.key))
+	if s.driver == nil {
+		log.WithFields(s.f).Error("probe failed")
+		return
+	}
+
 	s.kAPI = etcd.NewKeysAPI(disc.NewDiscovery())
-	s.Upkeep()
+
+	if s.Probe() != nil {
+		s.fail += 1
+		log.WithFields(s.f).Warning("probe missed")
+	} else {
+		s.Upkeep()
+	}
+
 	s.opts.PrevExist = etcd.PrevExist
 	s.jobId = Sched.Repeat(s.Hb, 1, s)
 }
 
 func (s *Service) Stop() {
 	Sched.Cancel(s.jobId)
+	if s.driver != nil {
+		s.driver.Close()
+		s.driver = nil
+	}
 	s.kAPI = nil
 	s.jobId = -1
 	s.opts.PrevExist = etcd.PrevIgnore
-	log.WithFields(log.Fields{"ID": s.Id[:12], "srv": s.Srv, "ttl": s.TTL}).Info("down")
+	log.WithFields(s.f).Info("down")
 }
 
 func (s *Service) Running() bool {

@@ -1,4 +1,4 @@
-package main
+package cmd
 
 import (
 	api "github.com/jeffjen/docker-monitor/api"
