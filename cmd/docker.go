@@ -50,7 +50,7 @@ func newRecord(iden string) {
 	if s := up.Get(iden); s != nil {
 		if s.Running() {
 			s.Stop()
-			log.WithFields(log.Fields{"ID": s.Id[:12], "srv": s.Srv}).Warning("inconsistent record")
+			log.WithFields(log.Fields{"ID": s.Id[:12]}).Warning("inconsistent record")
 		}
 		s.Start()
 		return

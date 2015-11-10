@@ -132,8 +132,10 @@ func MakeService(s *Service) {
 
 	s.opts = &etcd.SetOptions{TTL: s.TTL}
 
-	if rec.Set(s.Id, s) {
-		s.Start()
+	if s.Start() {
+		rec.Set(s.Id, s)
+	} else {
+		log.WithFields(log.Fields{"ID": s.Id[:12]}).Error("not tracking: probe failed")
 	}
 }
 
@@ -227,12 +229,10 @@ func (s *Service) Update() {
 	MakeService(s)
 }
 
-func (s *Service) Start() {
+func (s *Service) Start() bool {
 	// FIXME: we probably need a allow specific port for probing
-	s.driver, _ = AllocDriver(path.Base(s.key))
-	if s.driver == nil {
-		log.WithFields(s.f).Error("probe failed")
-		return
+	if s.driver, _ = AllocDriver(path.Base(s.key)); s.driver == nil {
+		return false
 	}
 
 	s.kAPI = etcd.NewKeysAPI(disc.NewDiscovery())
@@ -246,6 +246,8 @@ func (s *Service) Start() {
 
 	s.opts.PrevExist = etcd.PrevExist
 	s.jobId = Sched.Repeat(s.Hb, 1, s)
+
+	return true
 }
 
 func (s *Service) Stop() {
