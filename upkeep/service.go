@@ -116,14 +116,14 @@ func MakeService(s *Service) {
 	if len(s.Net) > 0 {
 		key := make([]string, 0)
 		for _, p := range s.Net {
-			if p.PublicPort != 0 {
+			if p.PublicPort != 0 && p.IP == "0.0.0.0" {
 				key = append(key, fmt.Sprintf("%s:%d", disc.Advertise, p.PublicPort))
 			}
 		}
 		if len(key) == 1 {
 			s.key = path.Join(s.Srv, strings.Join(key, ","))
 		} else {
-			log.WithFields(log.Fields{"ID": s.Id[:12]}).Warning("refuse; 0 or too many port")
+			log.WithFields(log.Fields{"ID": s.Id[:12], "Net": s.Net}).Warning("refuse; 0 or too many port")
 			return
 		}
 	} else if s.Port != "" {
@@ -237,11 +237,10 @@ func (s *Service) Start() bool {
 
 	s.kAPI = etcd.NewKeysAPI(disc.NewDiscovery())
 
+	s.Upkeep()
 	if s.Probe() != nil {
 		s.fail += 1
 		log.WithFields(s.f).Warning("probe missed")
-	} else {
-		s.Upkeep()
 	}
 
 	s.opts.PrevExist = etcd.PrevExist
