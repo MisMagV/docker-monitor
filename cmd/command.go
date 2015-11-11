@@ -4,6 +4,7 @@ import (
 	d "github.com/jeffjen/docker-monitor/driver"
 	mgo "github.com/jeffjen/docker-monitor/driver/mongodb"
 	r "github.com/jeffjen/docker-monitor/driver/redis"
+	web "github.com/jeffjen/docker-monitor/driver/web"
 	up "github.com/jeffjen/docker-monitor/upkeep"
 
 	cli "github.com/codegangsta/cli"
@@ -13,6 +14,17 @@ import (
 
 var (
 	Commands = []cli.Command{
+		{
+			Name:  "web",
+			Usage: "Track web service instances by http/https endpoint",
+			Flags: append(Flags, cli.StringFlag{
+				Name:  "path",
+				Value: "/",
+				Usage: "Endpoint to probe; default is getting root",
+			}),
+			Before: endpoint,
+			Action: Monitor,
+		},
 		{
 			Name:   "redis",
 			Usage:  "Track Redis/Sentinel/Cluster instance",
@@ -36,6 +48,14 @@ var (
 		},
 	}
 )
+
+func endpoint(ctx *cli.Context) error {
+	// create closure method for generating new driver for endpoint
+	up.AllocDriver = func(endpoint string) (d.Driver, error) {
+		return web.New(endpoint)
+	}
+	return nil
+}
 
 func redis(ctx *cli.Context) error {
 	// create closure method for generating new driver for endpoint

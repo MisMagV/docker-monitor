@@ -220,6 +220,7 @@ func (s *Service) Upkeep() {
 		log.WithFields(s.f).Warning(err)
 	} else {
 		log.WithFields(s.f).Info("up")
+		s.opts.PrevExist = etcd.PrevExist
 	}
 }
 
@@ -243,7 +244,6 @@ func (s *Service) Start() bool {
 		log.WithFields(s.f).Warning("probe missed")
 	}
 
-	s.opts.PrevExist = etcd.PrevExist
 	s.jobId = Sched.Repeat(s.Hb, 1, s)
 
 	return true
