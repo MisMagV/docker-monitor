@@ -74,13 +74,13 @@ func newRecord(iden string) {
 	if hbStr := info.Config.Labels["heartbeat"]; hbStr == "" {
 		Heartbeat = up.DEFAULT_HEARTBEAT
 	} else {
-		Heartbeat = up.ParseHearbeat(hbStr)
+		Heartbeat = up.ParseDuration(hbStr, up.DEFAULT_HEARTBEAT)
 	}
 
 	if ttlStr := info.Config.Labels["ttl"]; ttlStr == "" {
 		TTL = up.DEFAULT_TTL
 	} else {
-		TTL = up.ParseTTL(ttlStr)
+		TTL = up.ParseDuration(ttlStr, up.DEFAULT_TTL)
 	}
 
 	up.NewService(Heartbeat, TTL, iden, Srv, Port, Net)

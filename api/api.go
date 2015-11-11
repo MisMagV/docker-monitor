@@ -93,13 +93,13 @@ func register(w http.ResponseWriter, r *http.Request, args []string) {
 	if hbStr := r.Form.Get("hb"); hbStr == "" {
 		Heartbeat = up.DEFAULT_HEARTBEAT
 	} else {
-		Heartbeat = up.ParseHearbeat(hbStr)
+		Heartbeat = up.ParseDuration(hbStr, up.DEFAULT_HEARTBEAT)
 	}
 
 	if ttlStr := r.Form.Get("ttl"); ttlStr == "" {
 		TTL = up.DEFAULT_TTL
 	} else {
-		TTL = up.ParseTTL(ttlStr)
+		TTL = up.ParseDuration(ttlStr, up.DEFAULT_TTL)
 	}
 
 	up.NewService(Heartbeat, TTL, info.ID, Srv, Port, Net)
@@ -129,11 +129,11 @@ func update(w http.ResponseWriter, r *http.Request, args []string) {
 	}
 
 	if hbStr := r.Form.Get("hb"); hbStr != "" {
-		service.Hb = up.ParseHearbeat(hbStr)
+		service.Hb = up.ParseDuration(hbStr, service.Hb)
 	}
 
 	if ttlStr := r.Form.Get("ttl"); ttlStr != "" {
-		service.TTL = up.ParseTTL(ttlStr)
+		service.TTL = up.ParseDuration(ttlStr, service.TTL)
 	}
 
 	service.Update()

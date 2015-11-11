@@ -70,19 +70,11 @@ func Init(persist bool) {
 	}
 }
 
-func ParseHearbeat(s string) time.Duration {
-	if hb, err := time.ParseDuration(s); err != nil {
-		return 2 * time.Minute
+func ParseDuration(s string, df time.Duration) time.Duration {
+	if d, err := time.ParseDuration(s); err != nil {
+		return df
 	} else {
-		return hb
-	}
-}
-
-func ParseTTL(s string) time.Duration {
-	if ttl, err := time.ParseDuration(s); err != nil {
-		return 2*time.Minute + 30*time.Second
-	} else {
-		return ttl
+		return d
 	}
 }
 
