@@ -24,7 +24,7 @@ type StreamWriter struct {
 
 func (s *StreamWriter) Write(data []byte) (n int, err error) {
 	n, err = s.w.Write(data)
-	if err != nil {
+	if err == nil {
 		s.w.(http.Flusher).Flush()
 	}
 	return
