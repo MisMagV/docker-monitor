@@ -8,57 +8,7 @@ import (
 	cli "github.com/codegangsta/cli"
 
 	"os"
-	"time"
 )
-
-func check(c *cli.Context) error {
-	var (
-		hbStr   = c.String("heartbeat")
-		ttlStr  = c.String("ttl")
-		persist = c.Bool("persist")
-
-		heartbeat time.Duration
-		ttl       time.Duration
-	)
-
-	if disc.Advertise = c.String("advertise"); disc.Advertise == "" {
-		cli.ShowAppHelp(c)
-		log.Error("Required flag --advertise missing")
-		os.Exit(1)
-	}
-
-	heartbeat, err := time.ParseDuration(hbStr)
-	if err != nil {
-		log.Fatal(err)
-	}
-	ttl, err = time.ParseDuration(ttlStr)
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	if pos := c.Args(); len(pos) != 1 {
-		cli.ShowAppHelp(c)
-		log.Error("Required arguemnt DISCOVERY_URI")
-		os.Exit(1)
-	} else {
-		disc.Discovery = pos[0]
-	}
-
-	// register monitor instance
-	disc.Register(heartbeat, ttl)
-
-	// setup service upkeep
-	up.Init(persist)
-
-	log.WithFields(log.Fields{
-		"advertise": disc.Advertise,
-		"discovery": disc.Discovery,
-		"heartbeat": heartbeat,
-		"ttl":       ttl,
-	}).Info("begin monitor")
-
-	return nil
-}
 
 func Monitor(ctx *cli.Context) {
 	var (
@@ -68,7 +18,10 @@ func Monitor(ctx *cli.Context) {
 		stop = make(chan struct{}, 1)
 	)
 
-	check(ctx) // launch system init
+	disc.Check(ctx) // launch system init
+
+	// setup service upkeep
+	up.Init(ctx.Bool("persist"))
 
 	if addr != "" {
 		log.WithFields(log.Fields{"addr": addr}).Info("API endpoint begin")

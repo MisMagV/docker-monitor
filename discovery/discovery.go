@@ -10,11 +10,9 @@ import (
 	"time"
 )
 
-const (
-	RegisterPath = "/srv/monitor"
-)
-
 var (
+	RegisterPath = "/srv/monitor"
+
 	Advertise string
 	Discovery string
 )
