@@ -105,7 +105,9 @@ func Validate(iden, srv, port string, network []docker.APIPort) bool {
 func MakeService(s *Service) {
 	s.f = log.Fields{"ID": s.Id[:12], "srv": s.Srv, "heartbeat": s.Hb, "ttl": s.TTL}
 
-	if len(s.Net) > 0 {
+	if s.Port != "" {
+		s.key = path.Join(s.Srv, fmt.Sprintf("%s:%s", disc.Advertise, s.Port))
+	} else if len(s.Net) > 0 {
 		key := make([]string, 0)
 		for _, p := range s.Net {
 			if p.PublicPort != 0 && p.IP == "0.0.0.0" {
@@ -118,8 +120,6 @@ func MakeService(s *Service) {
 			log.WithFields(log.Fields{"ID": s.Id[:12], "Net": s.Net}).Warning("refuse; 0 or too many port")
 			return
 		}
-	} else if s.Port != "" {
-		s.key = path.Join(s.Srv, fmt.Sprintf("%s:%s", disc.Advertise, s.Port))
 	}
 
 	s.opts = &etcd.SetOptions{TTL: s.TTL}
