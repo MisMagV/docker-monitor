@@ -1,8 +1,8 @@
 package upkeep
 
 import (
-	disc "github.com/jeffjen/docker-monitor/discovery"
 	d "github.com/jeffjen/docker-monitor/driver"
+	disc "github.com/jeffjen/go-discovery"
 	"github.com/jeffjen/go-libkv/libkv"
 	timer "github.com/jeffjen/go-libkv/timer"
 

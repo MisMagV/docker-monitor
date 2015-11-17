@@ -1,8 +1,8 @@
 package cmd
 
 import (
-	disc "github.com/jeffjen/docker-monitor/discovery"
 	up "github.com/jeffjen/docker-monitor/upkeep"
+	dcli "github.com/jeffjen/go-discovery/cli"
 
 	log "github.com/Sirupsen/logrus"
 	cli "github.com/codegangsta/cli"
@@ -18,7 +18,10 @@ func Monitor(ctx *cli.Context) {
 		stop = make(chan struct{}, 1)
 	)
 
-	disc.Check(ctx) // launch system init
+	if err := dcli.Before(ctx); err != nil {
+		log.Error(err)
+		os.Exit(1)
+	}
 
 	// setup service upkeep
 	up.Init(ctx.Bool("persist"))

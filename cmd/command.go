@@ -17,7 +17,7 @@ var (
 		{
 			Name:  "web",
 			Usage: "Track web service instances by http/https endpoint",
-			Flags: append(Flags, cli.StringFlag{
+			Flags: append(NewFlag(), cli.StringFlag{
 				Name:  "path",
 				Value: "/",
 				Usage: "Endpoint to probe; default is getting root",
@@ -28,21 +28,21 @@ var (
 		{
 			Name:   "redis",
 			Usage:  "Track Redis/Sentinel/Cluster instance",
-			Flags:  Flags,
+			Flags:  NewFlag(),
 			Before: redis,
 			Action: Monitor,
 		},
 		{
 			Name:   "mgo",
 			Usage:  "Track mongod/mongos instance",
-			Flags:  Flags,
+			Flags:  NewFlag(),
 			Before: mongodb,
 			Action: Monitor,
 		},
 		{
 			Name:   "tcp",
 			Usage:  "Track generic tcp ping endpoint",
-			Flags:  Flags,
+			Flags:  NewFlag(),
 			Before: tcp,
 			Action: Monitor,
 		},
