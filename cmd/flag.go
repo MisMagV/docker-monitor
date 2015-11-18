@@ -20,6 +20,11 @@ var (
 			Name:  "persist",
 			Usage: "Experimental: Set flag to persist data",
 		},
+		cli.StringFlag{
+			Name:  "prefix",
+			Usage: "Prefix to apply for discovery",
+			Value: "/docker/swarm/nodes",
+		},
 	}
 )
 

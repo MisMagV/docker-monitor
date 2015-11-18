@@ -2,6 +2,7 @@ package cmd
 
 import (
 	up "github.com/jeffjen/docker-monitor/upkeep"
+	disc "github.com/jeffjen/go-discovery"
 	dcli "github.com/jeffjen/go-discovery/cli"
 
 	log "github.com/Sirupsen/logrus"
@@ -17,6 +18,9 @@ func Monitor(ctx *cli.Context) {
 
 		stop = make(chan struct{}, 1)
 	)
+
+	// setup register path for discovery
+	disc.RegisterPath = ctx.String("prefix")
 
 	if err := dcli.Before(ctx); err != nil {
 		log.Error(err)
