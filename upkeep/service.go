@@ -210,6 +210,7 @@ func (s *Service) Probe() error {
 func (s *Service) Upkeep() {
 	if _, err := s.kAPI.Set(ctx.Background(), s.key, s.Id, s.opts); err != nil {
 		log.WithFields(s.f).Warning(err)
+		s.opts.PrevExist = etcd.PrevIgnore
 	} else {
 		log.WithFields(s.f).Info("up")
 		s.opts.PrevExist = etcd.PrevExist
