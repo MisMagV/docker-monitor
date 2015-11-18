@@ -6,6 +6,9 @@ COPY docker-monitor /
 ENTRYPOINT ["/docker-monitor"]
 CMD ["--help"]
 
+ENV VERSION latest
+ENV BUILD golang-1.5.1
+
 ENV NODE_NAME ""
 ENV NODE_AVAIL_ZONE ""
 ENV NODE_REGION ""
