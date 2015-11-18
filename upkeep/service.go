@@ -32,6 +32,8 @@ var (
 	rec *libkv.Store
 
 	AllocDriver func(string) (d.Driver, error) = nil
+
+	Advertise string
 )
 
 func sync(jobId int64) {
@@ -48,6 +50,8 @@ func noop(string) (d.Driver, error) {
 
 func Init(persist bool) {
 	var err error
+
+	Advertise, _, _ = net.SplitHostPort(disc.Advertise)
 
 	if AllocDriver == nil {
 		AllocDriver = noop // default safety net for driver maker
@@ -106,12 +110,12 @@ func MakeService(s *Service) {
 	s.f = log.Fields{"ID": s.Id[:12], "srv": s.Srv, "heartbeat": s.Hb, "ttl": s.TTL}
 
 	if s.Port != "" {
-		s.key = path.Join(s.Srv, fmt.Sprintf("%s:%s", disc.Advertise, s.Port))
+		s.key = path.Join(s.Srv, fmt.Sprintf("%s:%s", Advertise, s.Port))
 	} else if len(s.Net) > 0 {
 		key := make([]string, 0)
 		for _, p := range s.Net {
 			if p.PublicPort != 0 && p.IP == "0.0.0.0" {
-				key = append(key, fmt.Sprintf("%s:%d", disc.Advertise, p.PublicPort))
+				key = append(key, fmt.Sprintf("%s:%d", Advertise, p.PublicPort))
 			}
 		}
 		if len(key) == 1 {
