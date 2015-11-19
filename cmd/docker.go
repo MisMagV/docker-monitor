@@ -1,11 +1,13 @@
 package cmd
 
 import (
+	pxy "github.com/jeffjen/docker-ambassador/proxy"
 	up "github.com/jeffjen/docker-monitor/upkeep"
 
 	log "github.com/Sirupsen/logrus"
 	docker "github.com/fsouza/go-dockerclient"
 
+	"encoding/json"
 	"time"
 )
 
@@ -65,9 +67,11 @@ func newRecord(iden string) {
 
 		Heartbeat time.Duration
 		TTL       time.Duration
+
+		Proxy = make([]pxy.Info, 0)
 	)
 
-	if !up.Validate(iden, Srv, Port, Net) {
+	if !up.Validate(info.ID, Srv, Port, Net) {
 		return
 	}
 
@@ -83,5 +87,20 @@ func newRecord(iden string) {
 		TTL = up.ParseDuration(ttlStr, up.DEFAULT_TTL)
 	}
 
-	up.NewService(Heartbeat, TTL, iden, Srv, Port, Net)
+	if proxySpec := info.Config.Labels["proxy"]; proxySpec != "" {
+		if err := json.Unmarshal([]byte(proxySpec), &Proxy); err != nil {
+			log.WithFields(log.Fields{"ID": info.ID[:12]}).Warning("reject invalid proxy spec")
+			return
+		}
+	}
+
+	up.MakeService(&up.Service{
+		Hb:    Heartbeat,
+		TTL:   TTL,
+		Id:    info.ID,
+		Srv:   Srv,
+		Port:  Port,
+		Net:   Net,
+		Proxy: Proxy,
+	})
 }

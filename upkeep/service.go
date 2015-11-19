@@ -1,115 +1,25 @@
 package upkeep
 
 import (
-	d "github.com/jeffjen/docker-monitor/driver"
+	pxy "github.com/jeffjen/docker-ambassador/proxy"
+	dri "github.com/jeffjen/docker-monitor/driver"
 	disc "github.com/jeffjen/go-discovery"
-	"github.com/jeffjen/go-libkv/libkv"
-	timer "github.com/jeffjen/go-libkv/timer"
 
 	log "github.com/Sirupsen/logrus"
 	etcd "github.com/coreos/etcd/client"
 	docker "github.com/fsouza/go-dockerclient"
 	ctx "golang.org/x/net/context"
 
-	"encoding/gob"
 	"fmt"
-	"net"
 	"path"
 	"strings"
 	"time"
 )
 
-const (
-	DEFAULT_HEARTBEAT = 2 * time.Minute
-	DEFAULT_TTL       = 2*time.Minute + 5*time.Second
-
-	DEFAULT_SYNC_PATH  = "/tmp"
-	DEFAULT_SYNC_CYCLE = 2 * time.Minute
-)
-
-var (
-	Sched *timer.Timer
-
-	rec *libkv.Store
-
-	AllocDriver func(string) (d.Driver, error) = nil
-
-	Advertise string
-)
-
-func sync(jobId int64) {
-	if err := rec.Save(DEFAULT_SYNC_PATH); err != nil {
-		log.Warningf("unable to persist: %v", err)
-	} else {
-		log.Infof("persist: %v", DEFAULT_SYNC_PATH)
-	}
-}
-
-func noop(string) (d.Driver, error) {
-	return &d.Noop{}, nil
-}
-
-func Init(persist bool) {
-	var err error
-
-	Advertise, _, _ = net.SplitHostPort(disc.Advertise)
-
-	if AllocDriver == nil {
-		AllocDriver = noop // default safety net for driver maker
-	}
-
-	Sched = timer.NewTimer()
-
-	Sched.Tic() // start the scheduler, don't ever stop
-
-	if persist {
-		if rec, err = libkv.Load(DEFAULT_SYNC_PATH); err != nil {
-			log.Warningf("unable to load: %v", err)
-		}
-		for _, k := range rec.Key() {
-			MakeService(rec.Get(k).(*Service))
-		}
-		Sched.RepeatFunc(DEFAULT_SYNC_CYCLE, 1, sync)
-	} else {
-		rec = libkv.NewStore()
-	}
-}
-
-func ParseDuration(s string, df time.Duration) time.Duration {
-	if d, err := time.ParseDuration(s); err != nil {
-		return df
-	} else {
-		return d
-	}
-}
-
-func Validate(iden, srv, port string, network []docker.APIPort) bool {
-	if srv == "" {
-		log.WithFields(log.Fields{"ID": iden}).Warning("not tracking: service")
-		return false
-	}
-	if port == "" {
-		if len(network) == 0 {
-			log.WithFields(log.Fields{"ID": iden}).Warning("not tracking: port")
-			return false
-		}
-		open := 0
-		for _, net := range network {
-			if net.PublicPort != 0 {
-				open += 1
-			}
-		}
-		if open == 0 {
-			log.WithFields(log.Fields{"ID": iden}).Warning("not tracking: port")
-			return false
-		}
-	}
-	return true
-}
-
 func MakeService(s *Service) {
 	s.f = log.Fields{"ID": s.Id[:12], "srv": s.Srv, "heartbeat": s.Hb, "ttl": s.TTL}
 
+	// Determine how this service is found by other service
 	if s.Port != "" {
 		s.key = path.Join(s.Srv, fmt.Sprintf("%s:%s", Advertise, s.Port))
 	} else if len(s.Net) > 0 {
@@ -127,6 +37,11 @@ func MakeService(s *Service) {
 		}
 	}
 
+	// Request to establish proxy port to ambassador
+	for _, pspec := range s.Proxy {
+		go openProxyReq(pspec)
+	}
+
 	s.opts = &etcd.SetOptions{TTL: s.TTL}
 
 	if s.Start() {
@@ -134,19 +49,6 @@ func MakeService(s *Service) {
 	} else {
 		log.WithFields(log.Fields{"ID": s.Id[:12]}).Error("not tracking: probe failed")
 	}
-}
-
-func NewService(heartbeat, ttl time.Duration, iden, service, port string, net []docker.APIPort) (s *Service) {
-	s = &Service{
-		Hb:   heartbeat,
-		TTL:  ttl,
-		Id:   iden,
-		Srv:  service,
-		Port: port,
-		Net:  net,
-	}
-	MakeService(s)
-	return
 }
 
 func ServiceStop(iden string) (s *Service) {
@@ -176,10 +78,11 @@ type Service struct {
 	Hb  time.Duration `json: "Heartbeat"`
 	TTL time.Duration `json: "TTL"`
 
-	Id   string           `json: "ContainerID"`
-	Srv  string           `json: "Service"`
-	Port string           `json: "Port"`
-	Net  []docker.APIPort `json: "Net"`
+	Id    string           `json: "ContainerID"`
+	Srv   string           `json: "Service"`
+	Port  string           `json: "Port"`
+	Net   []docker.APIPort `json: "Net"`
+	Proxy []pxy.Info       `json: "Proxy"`
 
 	kAPI etcd.KeysAPI     `json:-`
 	key  string           `json:-`
@@ -189,8 +92,8 @@ type Service struct {
 
 	f log.Fields `json:-`
 
-	driver d.Driver `json:-`
-	fail   int      `json:-`
+	driver dri.Driver `json:-`
+	fail   int        `json:-`
 }
 
 func (s *Service) Done(jobId int64) {
@@ -261,9 +164,4 @@ func (s *Service) Stop() {
 
 func (s *Service) Running() bool {
 	return s.jobId != -1
-}
-
-func init() {
-	gob.Register(&Service{})
-	gob.Register([]docker.APIPort{})
 }
