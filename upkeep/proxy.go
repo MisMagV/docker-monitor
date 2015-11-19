@@ -12,12 +12,17 @@ import (
 	"net/http"
 )
 
+const (
+	DefaultAmbassador = "http://localhost:29091/proxy"
+)
+
 func openProxyReq(pflag pxy.Info) {
 	var buf = new(bytes.Buffer)
 	json.NewEncoder(buf).Encode(pflag)
-	resp, err := http.Post("http://localhost:29091/proxy", "application/json", buf)
+	resp, err := http.Post(DefaultAmbassador, "application/json", buf)
 	if err != nil {
 		log.WithFields(log.Fields{"err": err}).Warning("openProxyReq")
+		return
 	}
 	defer resp.Body.Close()
 	io.Copy(ioutil.Discard, resp.Body)
