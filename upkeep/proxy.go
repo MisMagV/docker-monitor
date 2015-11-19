@@ -18,7 +18,10 @@ const (
 
 func openProxyReq(pflag pxy.Info) {
 	var buf = new(bytes.Buffer)
-	json.NewEncoder(buf).Encode(pflag)
+	if err := json.NewEncoder(buf).Encode(pflag); err != nil {
+		log.WithFields(log.Fields{"err": err}).Warning("openProxyReq")
+		return
+	}
 	resp, err := http.Post(DefaultAmbassador, "application/json", buf)
 	if err != nil {
 		log.WithFields(log.Fields{"err": err}).Warning("openProxyReq")
