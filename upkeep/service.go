@@ -115,13 +115,33 @@ func (s *Service) Probe() error {
 	return s.driver.Probe()
 }
 
-func (s *Service) Upkeep() {
-	if _, err := s.kAPI.Set(ctx.Background(), s.key, s.Id, s.opts); err != nil {
-		log.WithFields(s.f).Warning(err)
+func (s *Service) keep() error {
+	_, err := s.kAPI.Set(ctx.Background(), s.key, s.Id, s.opts)
+	if err == nil {
+		s.opts.PrevExist = etcd.PrevExist
+	} else {
 		s.opts.PrevExist = etcd.PrevIgnore
+	}
+	return err
+}
+
+func (s *Service) Upkeep() {
+	if err := s.keep(); err != nil {
+		nrr, ok := err.(etcd.Error)
+		if !ok {
+			log.WithFields(s.f).Error(err)
+			return
+		}
+		if nrr.Code != etcd.ErrorCodeKeyNotFound {
+			log.WithFields(s.f).Error(nrr)
+			return
+		}
+		// Last resort: set through
+		if err = s.keep(); err != nil {
+			log.WithFields(s.f).Error(err)
+		}
 	} else {
 		log.WithFields(s.f).Info("up")
-		s.opts.PrevExist = etcd.PrevExist
 	}
 }
 
