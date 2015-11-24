@@ -4,6 +4,7 @@ import (
 	pxy "github.com/jeffjen/docker-ambassador/proxy"
 	dri "github.com/jeffjen/docker-monitor/driver"
 	disc "github.com/jeffjen/go-discovery"
+	node "github.com/jeffjen/go-discovery/info"
 
 	log "github.com/Sirupsen/logrus"
 	etcd "github.com/coreos/etcd/client"
@@ -116,7 +117,7 @@ func (s *Service) Probe() error {
 }
 
 func (s *Service) keep() error {
-	_, err := s.kAPI.Set(ctx.Background(), s.key, s.Id, s.opts)
+	_, err := s.kAPI.Set(ctx.Background(), s.key, node.MetaData, s.opts)
 	if err == nil {
 		s.opts.PrevExist = etcd.PrevExist
 	} else {
