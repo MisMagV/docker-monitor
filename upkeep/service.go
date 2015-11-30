@@ -1,7 +1,8 @@
 package upkeep
 
 import (
-	pxy "github.com/jeffjen/docker-ambassador/proxy"
+	pxy "github.com/jeffjen/docker-ambassador/ambctl/arg"
+
 	dri "github.com/jeffjen/docker-monitor/driver"
 	disc "github.com/jeffjen/go-discovery"
 	node "github.com/jeffjen/go-discovery/info"

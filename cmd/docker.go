@@ -1,7 +1,7 @@
 package cmd
 
 import (
-	pxy "github.com/jeffjen/docker-ambassador/proxy"
+	pxy "github.com/jeffjen/docker-ambassador/ambctl/arg"
 	up "github.com/jeffjen/docker-monitor/upkeep"
 
 	log "github.com/Sirupsen/logrus"

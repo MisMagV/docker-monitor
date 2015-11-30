@@ -1,7 +1,7 @@
 package api
 
 import (
-	pxy "github.com/jeffjen/docker-ambassador/proxy"
+	pxy "github.com/jeffjen/docker-ambassador/ambctl/arg"
 	up "github.com/jeffjen/docker-monitor/upkeep"
 	d "github.com/jeffjen/go-discovery/info"
 
