@@ -1,13 +1,13 @@
 package upkeep
 
 import (
-	docker "github.com/fsouza/go-dockerclient"
 	dri "github.com/jeffjen/docker-monitor/driver"
 	disc "github.com/jeffjen/go-discovery"
 	"github.com/jeffjen/go-libkv/libkv"
 	timer "github.com/jeffjen/go-libkv/timer"
 
 	log "github.com/Sirupsen/logrus"
+	docker "github.com/fsouza/go-dockerclient"
 
 	"encoding/gob"
 	"net"
