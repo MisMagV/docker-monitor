@@ -31,4 +31,26 @@ func openProxyReq(pflag pxy.Info) {
 	io.Copy(ioutil.Discard, resp.Body)
 }
 
+func openProxyConfig(proxycfg string, targets []pxy.Info) {
+	// Request to establish proxy port to ambassador
+	for _, pxyspec := range targets {
+		go openProxyReq(pxyspec)
+	}
+
+	var cli = new(http.Client)
+	req, err := http.NewRequest("PUT", DefaultAmbassador+"/app-config?key="+proxycfg, nil)
+	if err != nil {
+		log.WithFields(log.Fields{"err": err}).Warning("openProxyConfig")
+		return
+	}
+	resp, err := cli.Do(req)
+	if err != nil {
+		log.WithFields(log.Fields{"err": err}).Warning("openProxyConfig")
+		return
+	}
+
+	defer resp.Body.Close()
+	io.Copy(ioutil.Discard, resp.Body)
+}
+
 // TODO: what should we do to close a proxy req?

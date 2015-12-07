@@ -40,9 +40,7 @@ func MakeService(s *Service) {
 	}
 
 	// Request to establish proxy port to ambassador
-	for _, pspec := range s.Proxy {
-		go openProxyReq(pspec)
-	}
+	go openProxyConfig(s.ProxyCfg, s.Proxy)
 
 	s.opts = &etcd.SetOptions{TTL: s.TTL}
 
@@ -80,11 +78,12 @@ type Service struct {
 	Hb  time.Duration `json: "Heartbeat"`
 	TTL time.Duration `json: "TTL"`
 
-	Id    string           `json: "ContainerID"`
-	Srv   string           `json: "Service"`
-	Port  string           `json: "Port"`
-	Net   []docker.APIPort `json: "Net"`
-	Proxy []pxy.Info       `json: "Proxy"`
+	Id       string           `json: "ContainerID"`
+	Srv      string           `json: "Service"`
+	Port     string           `json: "Port"`
+	Net      []docker.APIPort `json: "Net"`
+	Proxy    []pxy.Info       `json: "Proxy"`
+	ProxyCfg string           `json: "ProxyCfg"`
 
 	kAPI etcd.KeysAPI     `json:-`
 	key  string           `json:-`

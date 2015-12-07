@@ -68,7 +68,8 @@ func newRecord(iden string) {
 		Heartbeat time.Duration
 		TTL       time.Duration
 
-		Proxy = make([]pxy.Info, 0)
+		Proxy    = make([]pxy.Info, 0)
+		ProxyCfg string
 	)
 
 	if !up.Validate(info.ID, Srv, Port, Net) {
@@ -93,14 +94,16 @@ func newRecord(iden string) {
 			return
 		}
 	}
+	ProxyCfg = info.Config.Labels["proxycfg"]
 
 	up.MakeService(&up.Service{
-		Hb:    Heartbeat,
-		TTL:   TTL,
-		Id:    info.ID,
-		Srv:   Srv,
-		Port:  Port,
-		Net:   Net,
-		Proxy: Proxy,
+		Hb:       Heartbeat,
+		TTL:      TTL,
+		Id:       info.ID,
+		Srv:      Srv,
+		Port:     Port,
+		Net:      Net,
+		Proxy:    Proxy,
+		ProxyCfg: ProxyCfg,
 	})
 }
