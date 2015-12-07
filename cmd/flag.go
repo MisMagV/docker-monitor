@@ -23,7 +23,7 @@ var (
 		cli.StringFlag{
 			Name:  "prefix",
 			Usage: "Prefix to apply for discovery",
-			Value: "/docker/swarm/nodes",
+			Value: "/debug/docker/swarm/nodes",
 		},
 	}
 )
