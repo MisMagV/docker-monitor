@@ -13,7 +13,7 @@ import (
 )
 
 const (
-	DefaultAmbassador = "http://localhost:29091/proxy"
+	DefaultAmbassador = "http://ambassador:29091/proxy"
 )
 
 func openProxyReq(pflag pxy.Info) {
