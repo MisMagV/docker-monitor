@@ -12,7 +12,16 @@ type RedisDriver struct {
 }
 
 func (r *RedisDriver) Probe(c ctx.Context) error {
-	return r.Ping().Err()
+	resp := make(chan error, 1)
+	go func() {
+		resp <- r.Ping().Err()
+	}()
+	select {
+	case err := <-resp:
+		return err
+	case <-c.Done():
+		return c.Err()
+	}
 }
 
 func New(addr string) (d.Driver, error) {

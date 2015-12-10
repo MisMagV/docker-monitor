@@ -7,10 +7,9 @@ import (
 
 	"errors"
 	ctx "golang.org/x/net/context"
-	"golang.org/x/net/context/ctxhttp"
+	http "golang.org/x/net/context/ctxhttp"
 	"io"
 	"io/ioutil"
-	"net/http"
 	"net/url"
 )
 
@@ -23,8 +22,8 @@ type HttpProbe struct {
 }
 
 func (h *HttpProbe) Probe(c ctx.Context) error {
-	resp, err := ctxhttp.Get(c, http.DefaultClient, h.url)
-	log.WithFields(log.Fields{"StatusCode": resp.StatusCode, "Proto": resp.Proto, "Url": h.url}).Debug("web")
+	log.WithFields(log.Fields{"url": h.url}).Debug("web")
+	resp, err := http.Get(c, nil, h.url)
 	if err != nil {
 		return err
 	} else {

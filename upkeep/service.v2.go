@@ -49,6 +49,8 @@ const (
 	UpkeepTimeout = 250 * time.Millisecond
 
 	ProbeTimeout = 100 * time.Millisecond
+
+	MaxFailAttemps = 3
 )
 
 type Service struct {
@@ -76,8 +78,6 @@ type srv struct {
 	opts *etcd.SetOptions
 
 	driver dri.Driver
-
-	failAttempts uint64
 }
 
 func (serv *srv) keep(c ctx.Context) (resp <-chan error) {
@@ -135,8 +135,11 @@ func Register(service *Service) {
 		etcd.NewKeysAPI(disc.NewDiscovery()),
 		&etcd.SetOptions{TTL: service.TTL},
 		nil,
-		0,
 	}
+
+	logger := log.WithFields(log.Fields{
+		"ID": serv.Id[:12], "srv": serv.Srv, "heartbeat": serv.Hb, "ttl": serv.TTL,
+	})
 
 	// Advertise key on the discovery service
 	if serv.Port != "" {
@@ -150,20 +153,26 @@ func Register(service *Service) {
 		}
 	}
 
-	endpoint := path.Join(path.Base(serv.key[0]), serv.ProbeEndpoint)
-	log.WithFields(log.Fields{"probe": endpoint}).Debug("register")
+	var endpoint string
+	if serv.ProbeEndpoint == "" {
+		endpoint = path.Base(serv.key[0])
+	} else {
+		endpoint = fmt.Sprintf("%s/%s", path.Base(serv.key[0]), serv.ProbeEndpoint)
+	}
 
 	// TODO:  setup driver for probing
-	serv.driver, _ = alloc(endpoint)
+	driver, drr := alloc(endpoint)
+	if drr != nil {
+		logger.WithFields(log.Fields{"err": drr}).Error("-register")
+		return
+	}
+	serv.driver = driver
+	logger.Debug("+register")
 
 	c, abort := ctx.WithCancel(RootContext)
 	go func() {
 		// Request to establish proxy port to ambassador
 		openProxyConfig(serv.ProxyCfg, serv.Proxy)
-
-		logger := log.WithFields(log.Fields{
-			"ID": serv.Id[:12], "srv": serv.Srv, "heartbeat": serv.Hb, "ttl": serv.TTL,
-		})
 
 		// setup work cycle
 		heartbeat, probe := time.NewTicker(serv.Hb), time.NewTicker(serv.PHb)
@@ -188,11 +197,13 @@ func Register(service *Service) {
 			abort() // release
 		}()
 
+		var chk = NewFail(MaxFailAttemps)
 		for yay := true; yay; {
 			select {
 			case <-heartbeat.C:
-				if serv.failAttempts > 0 {
-					logger.WithFields(log.Fields{"fail": serv.failAttempts}).Error("--up")
+				if !chk.Pass() {
+					serv.opts.PrevExist = etcd.PrevIgnore
+					logger.Error("!up")
 				} else {
 					d, abort := ctx.WithTimeout(c, UpkeepTimeout)
 					select {
@@ -212,16 +223,14 @@ func Register(service *Service) {
 				d, abort := ctx.WithTimeout(c, ProbeTimeout)
 				select {
 				case <-d.Done():
-					logger.WithFields(log.Fields{"err": d.Err()}).Warning("*probe")
+					count := chk.Bad()
+					logger.WithFields(log.Fields{"err": d.Err(), "fail": count}).Warning("*probe")
 				case e := <-serv.probe(d):
 					if e != nil {
-						serv.failAttempts += 1
-						logger.WithFields(log.Fields{"err": e, "fail": serv.failAttempts}).Warning("-probe")
+						count := chk.Bad()
+						logger.WithFields(log.Fields{"err": e, "fail": count}).Warning("-probe")
 					} else {
-						if serv.failAttempts > 0 {
-							logger.WithFields(log.Fields{"recover": serv.failAttempts}).Debug("+probe")
-						}
-						serv.failAttempts = 0
+						chk.Good()
 						logger.Info("+probe")
 					}
 				}

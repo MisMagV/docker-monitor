@@ -8,10 +8,10 @@ import (
 )
 
 const (
-	DEFAULT_HEARTBEAT = 1 * time.Minute
-	DEFAULT_TTL       = 1*time.Minute + 5*time.Second
+	DEFAULT_HEARTBEAT = 30 * time.Second
+	DEFAULT_TTL       = 35 * time.Second
 
-	DEFAULT_PROBE = 15 * time.Second
+	DEFAULT_PROBE = 5 * time.Second
 )
 
 func ParseDuration(s string, df time.Duration) time.Duration {
@@ -44,4 +44,31 @@ func Validate(iden, srv, port string, network []docker.APIPort) bool {
 		}
 	}
 	return true
+}
+
+type Fail struct {
+	threshold uint64
+	attempts  uint64
+}
+
+func NewFail(threshold uint64) *Fail {
+	return &Fail{threshold, 0}
+}
+
+func (f *Fail) Pass() (ok bool) {
+	ok = f.attempts < f.threshold
+	f.attempts = 0
+	return
+}
+
+func (f *Fail) Bad() uint64 {
+	f.attempts += 1
+	return f.attempts
+}
+
+func (f *Fail) Good() uint64 {
+	if f.attempts > 0 {
+		f.attempts -= 1
+	}
+	return f.attempts
 }
