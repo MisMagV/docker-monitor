@@ -69,7 +69,7 @@ func newRecord(iden string) {
 		ProbeEndpoint  = info.Config.Labels["probe_endpoint"]
 
 		Proxy    = make([]pxy.Info, 0)
-		ProxyCfg string
+		ProxyCfg = info.Config.Labels["proxycfg"]
 	)
 
 	if !up.Validate(info.ID, Srv, Port, Net) {
@@ -100,7 +100,6 @@ func newRecord(iden string) {
 			return
 		}
 	}
-	ProxyCfg = info.Config.Labels["proxycfg"]
 
 	up.Place(&up.Service{
 		Hb:            Heartbeat,
