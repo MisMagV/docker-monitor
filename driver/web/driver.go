@@ -3,8 +3,6 @@ package web
 import (
 	d "github.com/jeffjen/docker-monitor/driver"
 
-	log "github.com/Sirupsen/logrus"
-
 	"errors"
 	ctx "golang.org/x/net/context"
 	http "golang.org/x/net/context/ctxhttp"
