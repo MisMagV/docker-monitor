@@ -1,7 +1,7 @@
 package upkeep
 
 import (
-	pxy "github.com/jeffjen/docker-ambassador/ambctl/arg"
+	pxy "github.com/jeffjen/ambd/ambctl/arg"
 
 	log "github.com/Sirupsen/logrus"
 

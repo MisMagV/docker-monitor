@@ -3,6 +3,7 @@ package redis
 import (
 	d "github.com/jeffjen/docker-monitor/driver"
 
+	ctx "golang.org/x/net/context"
 	"gopkg.in/redis.v3"
 )
 
@@ -10,11 +11,8 @@ type RedisDriver struct {
 	*redis.Client
 }
 
-func (r *RedisDriver) Probe() error {
+func (r *RedisDriver) Probe(c ctx.Context) error {
 	return r.Ping().Err()
-}
-
-func (r *RedisDriver) Close() {
 }
 
 func New(addr string) (d.Driver, error) {

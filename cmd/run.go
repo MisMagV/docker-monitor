@@ -38,7 +38,7 @@ func Monitor(ctx *cli.Context) {
 	}
 
 	if !idle {
-		log.WithFields(log.Fields{"addr": os.Getenv("DOCKER_HOST")}).Info("Track container life cycle")
+		log.Info("Track container life cycle")
 		go runDockerEvent(stop)
 	} else {
 		log.Warning("docker event endpoint disabled")

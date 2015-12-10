@@ -8,8 +8,10 @@ import (
 )
 
 const (
-	DEFAULT_HEARTBEAT = 2 * time.Minute
-	DEFAULT_TTL       = 2*time.Minute + 5*time.Second
+	DEFAULT_HEARTBEAT = 1 * time.Minute
+	DEFAULT_TTL       = 1*time.Minute + 5*time.Second
+
+	DEFAULT_PROBE = 15 * time.Second
 )
 
 func ParseDuration(s string, df time.Duration) time.Duration {

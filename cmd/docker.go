@@ -1,7 +1,7 @@
 package cmd
 
 import (
-	pxy "github.com/jeffjen/docker-ambassador/ambctl/arg"
+	pxy "github.com/jeffjen/ambd/ambctl/arg"
 	up "github.com/jeffjen/docker-monitor/upkeep"
 
 	log "github.com/Sirupsen/logrus"
@@ -39,10 +39,10 @@ func runDockerEvent(stop chan<- struct{}) {
 			go newRecord(event.ID)
 			break
 		case "die":
-			go up.ServiceStop(event.ID)
+			go up.Suspend(event.ID)
 			break
 		case "destroy":
-			go up.ServiceDie(event.ID)
+			go up.Unregister(event.ID)
 			break
 		}
 	}
@@ -50,11 +50,7 @@ func runDockerEvent(stop chan<- struct{}) {
 
 func newRecord(iden string) {
 	if s := up.Get(iden); s != nil {
-		if s.Running() {
-			s.Stop()
-			log.WithFields(log.Fields{"ID": s.Id[:12]}).Warning("inconsistent record")
-		}
-		s.Start()
+		up.Register(s)
 		return
 	}
 
@@ -68,6 +64,10 @@ func newRecord(iden string) {
 		Heartbeat time.Duration
 		TTL       time.Duration
 
+		ProbeHeartbeat time.Duration
+		ProbeType      = info.Config.Labels["probe_type"]
+		ProbeEndpoint  = info.Config.Labels["probe_endpoint"]
+
 		Proxy    = make([]pxy.Info, 0)
 		ProxyCfg string
 	)
@@ -80,6 +80,12 @@ func newRecord(iden string) {
 		Heartbeat = up.DEFAULT_HEARTBEAT
 	} else {
 		Heartbeat = up.ParseDuration(hbStr, up.DEFAULT_HEARTBEAT)
+	}
+
+	if phbStr := info.Config.Labels["probe_heartbeat"]; phbStr == "" {
+		ProbeHeartbeat = up.DEFAULT_PROBE
+	} else {
+		ProbeHeartbeat = up.ParseDuration(phbStr, up.DEFAULT_PROBE)
 	}
 
 	if ttlStr := info.Config.Labels["ttl"]; ttlStr == "" {
@@ -96,14 +102,17 @@ func newRecord(iden string) {
 	}
 	ProxyCfg = info.Config.Labels["proxycfg"]
 
-	up.MakeService(&up.Service{
-		Hb:       Heartbeat,
-		TTL:      TTL,
-		Id:       info.ID,
-		Srv:      Srv,
-		Port:     Port,
-		Net:      Net,
-		Proxy:    Proxy,
-		ProxyCfg: ProxyCfg,
+	up.Place(&up.Service{
+		Hb:            Heartbeat,
+		TTL:           TTL,
+		PHb:           ProbeHeartbeat,
+		ProbeType:     ProbeType,
+		ProbeEndpoint: ProbeEndpoint,
+		Id:            info.ID,
+		Srv:           Srv,
+		Port:          Port,
+		Net:           Net,
+		Proxy:         Proxy,
+		ProxyCfg:      ProxyCfg,
 	})
 }

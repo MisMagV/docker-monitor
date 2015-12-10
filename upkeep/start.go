@@ -1,13 +1,12 @@
 package upkeep
 
 import (
-	dri "github.com/jeffjen/docker-monitor/driver"
 	disc "github.com/jeffjen/go-discovery"
 	"github.com/jeffjen/go-libkv/libkv"
-	timer "github.com/jeffjen/go-libkv/timer"
 
 	log "github.com/Sirupsen/logrus"
 	docker "github.com/fsouza/go-dockerclient"
+	ctx "golang.org/x/net/context"
 
 	"encoding/gob"
 	"net"
@@ -20,18 +19,22 @@ const (
 )
 
 var (
-	Sched *timer.Timer
-
 	rec *libkv.Store
-
-	AllocDriver func(string) (dri.Driver, error) = nil
 
 	Advertise string
 )
 
-func noop(string) (dri.Driver, error) {
-	return &dri.Noop{}, nil
+type RunningRecord struct {
+	Srv   string
+	Abort ctx.CancelFunc
 }
+
+var (
+	RootContext ctx.Context
+	ResetAll    ctx.CancelFunc
+
+	Record = make(map[string]*RunningRecord)
+)
 
 func sync(jobId int64) {
 	if err := rec.Save(DEFAULT_SYNC_PATH); err != nil {
@@ -46,22 +49,16 @@ func Init(persist bool) {
 
 	Advertise, _, _ = net.SplitHostPort(disc.Advertise)
 
-	if AllocDriver == nil {
-		AllocDriver = noop // default safety net for driver maker
-	}
-
-	Sched = timer.NewTimer()
-
-	Sched.Tic() // start the scheduler, don't ever stop
-
 	if persist {
 		if rec, err = libkv.Load(DEFAULT_SYNC_PATH); err != nil {
 			log.WithFields(log.Fields{"err": err}).Warning("load failed")
 		}
-		for _, k := range rec.Key() {
-			MakeService(rec.Get(k).(*Service))
+		for k := range rec.IterateR() {
+			service, ok := k.X.(*Service)
+			if ok {
+				Register(service)
+			}
 		}
-		Sched.RepeatFunc(DEFAULT_SYNC_CYCLE, 1, sync)
 	} else {
 		rec = libkv.NewStore()
 	}
@@ -70,4 +67,6 @@ func Init(persist bool) {
 func init() {
 	gob.Register(&Service{})
 	gob.Register([]docker.APIPort{})
+
+	RootContext, ResetAll = ctx.WithCancel(ctx.Background())
 }

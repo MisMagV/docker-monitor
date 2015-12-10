@@ -1,7 +1,7 @@
 package api
 
 import (
-	pxy "github.com/jeffjen/docker-ambassador/ambctl/arg"
+	pxy "github.com/jeffjen/ambd/ambctl/arg"
 	up "github.com/jeffjen/docker-monitor/upkeep"
 	d "github.com/jeffjen/go-discovery/info"
 
@@ -51,6 +51,10 @@ func register(w http.ResponseWriter, r *http.Request, args []string) {
 		Heartbeat time.Duration
 		TTL       time.Duration
 
+		ProbeHeartbeat time.Duration
+		ProbeType      = info.Config.Labels["probetype"]
+		ProbeEndpoint  = info.Config.Labels["probe_endpoint"]
+
 		Proxy    = make([]pxy.Info, 0)
 		ProxyCfg string
 	)
@@ -64,6 +68,12 @@ func register(w http.ResponseWriter, r *http.Request, args []string) {
 		Heartbeat = up.DEFAULT_HEARTBEAT
 	} else {
 		Heartbeat = up.ParseDuration(hbStr, up.DEFAULT_HEARTBEAT)
+	}
+
+	if phbStr := info.Config.Labels["probefreq"]; phbStr == "" {
+		ProbeHeartbeat = up.DEFAULT_PROBE
+	} else {
+		ProbeHeartbeat = up.ParseDuration(phbStr, up.DEFAULT_PROBE)
 	}
 
 	if ttlStr := r.Form.Get("ttl"); ttlStr == "" {
@@ -80,15 +90,18 @@ func register(w http.ResponseWriter, r *http.Request, args []string) {
 	}
 	ProxyCfg = info.Config.Labels["proxycfg"]
 
-	up.MakeService(&up.Service{
-		Hb:       Heartbeat,
-		TTL:      TTL,
-		Id:       info.ID,
-		Srv:      Srv,
-		Port:     Port,
-		Net:      Net,
-		Proxy:    Proxy,
-		ProxyCfg: ProxyCfg,
+	up.Place(&up.Service{
+		Hb:            Heartbeat,
+		TTL:           TTL,
+		PHb:           ProbeHeartbeat,
+		ProbeType:     ProbeType,
+		ProbeEndpoint: ProbeEndpoint,
+		Id:            info.ID,
+		Srv:           Srv,
+		Port:          Port,
+		Net:           Net,
+		Proxy:         Proxy,
+		ProxyCfg:      ProxyCfg,
 	})
 
 	w.Write([]byte("ok"))
@@ -115,15 +128,7 @@ func update(w http.ResponseWriter, r *http.Request, args []string) {
 		service.Port = port
 	}
 
-	if hbStr := r.Form.Get("hb"); hbStr != "" {
-		service.Hb = up.ParseDuration(hbStr, service.Hb)
-	}
-
-	if ttlStr := r.Form.Get("ttl"); ttlStr != "" {
-		service.TTL = up.ParseDuration(ttlStr, service.TTL)
-	}
-
-	service.Update()
+	up.Place(service)
 
 	w.Write([]byte("ok"))
 }
