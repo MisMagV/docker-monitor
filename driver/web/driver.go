@@ -22,7 +22,6 @@ type HttpProbe struct {
 }
 
 func (h *HttpProbe) Probe(c ctx.Context) error {
-	log.WithFields(log.Fields{"url": h.url}).Debug("web")
 	resp, err := http.Get(c, nil, h.url)
 	if err != nil {
 		return err
