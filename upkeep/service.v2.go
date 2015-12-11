@@ -182,6 +182,8 @@ func Register(service *Service) {
 
 	wk, abort := ctx.WithCancel(RootContext)
 	go func() {
+		defer serv.driver.Close()
+
 		// Request to establish proxy port to ambassador
 		openProxyConfig(serv.ProxyCfg, serv.Proxy)
 

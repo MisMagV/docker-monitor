@@ -36,6 +36,10 @@ func (h *HttpProbe) Probe(c ctx.Context) error {
 	}
 }
 
+func (h *HttpProbe) Close() error {
+	return nil
+}
+
 func New(endpoint string) (d.Driver, error) {
 	u, _ := url.Parse(endpoint)
 	u.Scheme = "http"

@@ -4,16 +4,22 @@ import (
 	log "github.com/Sirupsen/logrus"
 	ctx "golang.org/x/net/context"
 
+	"io"
 	"os"
 )
 
 type Driver interface {
+	io.Closer
 	Probe(c ctx.Context) error
 }
 
 type Noop struct{}
 
 func (n *Noop) Probe(c ctx.Context) error {
+	return nil
+}
+
+func (n *Noop) Close() error {
 	return nil
 }
 

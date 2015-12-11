@@ -24,6 +24,10 @@ func (m *MongoDriver) Probe(c ctx.Context) error {
 	}
 }
 
+func (m *MongoDriver) Close() error {
+	return nil
+}
+
 func New(addr string) (d.Driver, error) {
 	sess, err := mgo.Dial(addr)
 	if err != nil {

@@ -24,6 +24,10 @@ func (r *RedisDriver) Probe(c ctx.Context) error {
 	}
 }
 
+func (r *RedisDriver) Close() error {
+	return nil
+}
+
 func New(addr string) (d.Driver, error) {
 	cli := redis.NewClient(&redis.Options{
 		Addr: addr,
