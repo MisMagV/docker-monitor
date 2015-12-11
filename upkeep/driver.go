@@ -20,9 +20,10 @@ var (
 			return &dri.Noop{}, nil
 		},
 
-		"redis": redis.New,
-		"mgo":   mgo.New,
-		"web":   web.New,
+		"redis":    redis.New,
+		"sentinel": redis.NewSentinel,
+		"mgo":      mgo.New,
+		"web":      web.New,
 	}
 
 	ErrNoSuchDriver = errors.New("no such driver")
