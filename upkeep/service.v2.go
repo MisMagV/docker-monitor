@@ -80,37 +80,48 @@ type srv struct {
 	driver dri.Driver
 }
 
-func (serv *srv) keep(c ctx.Context) (resp <-chan error) {
+func (serv *srv) keep(c ctx.Context) (err error) {
 	output := make(chan error, 1)
 	go func() {
-		var err error
 		for _, k := range serv.key {
-			_, err = serv.kAPI.Set(c, k, node.MetaData, serv.opts)
-			if err == nil {
-				serv.opts.PrevExist = etcd.PrevExist
-			} else {
+			_, krr := serv.kAPI.Set(c, k, node.MetaData, serv.opts)
+			if krr != nil {
 				serv.opts.PrevExist = etcd.PrevIgnore
-				break
+				output <- err
+				return // break out
+			} else {
+				serv.opts.PrevExist = etcd.PrevExist
 			}
 		}
-		log.WithFields(log.Fields{"err": err, "key": serv.key}).Debug("keep")
-		output <- err
+		output <- nil // all good
 	}()
-	return output
+	select {
+	case <-c.Done():
+		err = c.Err()
+	case e := <-output:
+		err = e
+	}
+	return
 }
 
-func (serv *srv) probe(c ctx.Context) (resp <-chan error) {
+func (serv *srv) probe(c ctx.Context) (err error) {
 	output := make(chan error, 1)
 	go func() {
-		var err error
-		if err = serv.driver.Probe(c); err != nil {
-			output <- err
+		prr := serv.driver.Probe(c)
+		if err != nil {
+			output <- prr
 		} else {
 			output <- nil
 		}
 		log.WithFields(log.Fields{"err": err, "srv": serv.Srv}).Debug("probe")
 	}()
-	return output
+	select {
+	case <-c.Done():
+		err = c.Err()
+	case e := <-output:
+		err = e
+	}
+	return
 }
 
 func Get(iden string) (s *Service) {
@@ -169,7 +180,7 @@ func Register(service *Service) {
 	serv.driver = driver
 	logger.Debug("+register")
 
-	c, abort := ctx.WithCancel(RootContext)
+	wk, abort := ctx.WithCancel(RootContext)
 	go func() {
 		// Request to establish proxy port to ambassador
 		openProxyConfig(serv.ProxyCfg, serv.Proxy)
@@ -183,16 +194,11 @@ func Register(service *Service) {
 
 		logger.Info("start")
 		func() {
-			d, abort := ctx.WithTimeout(c, UpkeepTimeout)
-			select {
-			case <-d.Done():
-				logger.WithFields(log.Fields{"err": d.Err()}).Error("*up")
-			case e := <-serv.keep(d):
-				if e != nil {
-					logger.WithFields(log.Fields{"err": e}).Error("-up")
-				} else {
-					logger.Info("+up")
-				}
+			d, abort := ctx.WithTimeout(wk, UpkeepTimeout)
+			if err := serv.keep(d); err != nil {
+				logger.WithFields(log.Fields{"err": err}).Error("-up")
+			} else {
+				logger.Info("+up")
 			}
 			abort() // release
 		}()
@@ -201,42 +207,31 @@ func Register(service *Service) {
 		for yay := true; yay; {
 			select {
 			case <-heartbeat.C:
+				d, abort := ctx.WithTimeout(wk, UpkeepTimeout)
 				if !chk.Pass() {
 					serv.opts.PrevExist = etcd.PrevIgnore
 					logger.Error("!up")
 				} else {
-					d, abort := ctx.WithTimeout(c, UpkeepTimeout)
-					select {
-					case <-d.Done():
-						logger.WithFields(log.Fields{"err": d.Err()}).Error("*up")
-					case e := <-serv.keep(d):
-						if e != nil {
-							logger.WithFields(log.Fields{"err": e}).Error("-up")
-						} else {
-							logger.Info("+up")
-						}
-					}
-					abort() // release
-				}
-
-			case <-probe.C:
-				d, abort := ctx.WithTimeout(c, ProbeTimeout)
-				select {
-				case <-d.Done():
-					count := chk.Bad()
-					logger.WithFields(log.Fields{"err": d.Err(), "fail": count}).Warning("*probe")
-				case e := <-serv.probe(d):
-					if e != nil {
-						count := chk.Bad()
-						logger.WithFields(log.Fields{"err": e, "fail": count}).Warning("-probe")
+					if err := serv.keep(d); err != nil {
+						logger.WithFields(log.Fields{"err": err}).Error("-up")
 					} else {
-						chk.Good()
-						logger.Info("+probe")
+						logger.Info("+up")
 					}
 				}
 				abort() // release
 
-			case <-c.Done():
+			case <-probe.C:
+				d, abort := ctx.WithTimeout(wk, ProbeTimeout)
+				if err := serv.probe(d); err != nil {
+					count := chk.Bad()
+					logger.WithFields(log.Fields{"err": err, "fail": count}).Warning("-probe")
+				} else {
+					chk.Good()
+					logger.Info("+probe")
+				}
+				abort() // release
+
+			case <-wk.Done():
 				logger.Warning("down")
 				yay = false
 			}
