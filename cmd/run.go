@@ -9,6 +9,11 @@ import (
 	cli "github.com/codegangsta/cli"
 
 	"os"
+	"path"
+)
+
+const (
+	DiscoveryPath = "/docker/swarm/nodes"
 )
 
 func Monitor(ctx *cli.Context) {
@@ -20,7 +25,7 @@ func Monitor(ctx *cli.Context) {
 	)
 
 	// setup register path for discovery
-	disc.RegisterPath = ctx.String("prefix")
+	disc.RegisterPath = path.Join(ctx.String("cluster"), DiscoveryPath)
 
 	if err := dcli.Before(ctx); err != nil {
 		log.Error(err)

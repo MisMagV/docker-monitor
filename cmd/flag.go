@@ -12,6 +12,11 @@ var (
 			Name:  "addr",
 			Usage: "API endpoint for admin",
 		},
+		cli.StringFlag{
+			Name:  "cluster",
+			Usage: "cluster to apply for discovery",
+			Value: "debug",
+		},
 		cli.BoolFlag{
 			Name:  "idle",
 			Usage: "Set flag to disable active container life cycle event",
@@ -19,11 +24,6 @@ var (
 		cli.BoolFlag{
 			Name:  "persist",
 			Usage: "Experimental: Set flag to persist data",
-		},
-		cli.StringFlag{
-			Name:  "prefix",
-			Usage: "Prefix to apply for discovery",
-			Value: "/debug/docker/swarm/nodes",
 		},
 	}
 )
