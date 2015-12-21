@@ -46,7 +46,7 @@ func init() {
 }
 
 const (
-	UpkeepTimeout = 250 * time.Millisecond
+	UpkeepTimeout = 3 * time.Second
 
 	ProbeTimeout = 100 * time.Millisecond
 
