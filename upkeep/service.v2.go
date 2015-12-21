@@ -229,7 +229,7 @@ func Register(service *Service) {
 					logger.WithFields(log.Fields{"err": err, "fail": count}).Warning("-probe")
 				} else {
 					chk.Good()
-					logger.Info("+probe")
+					logger.Debug("+probe")
 				}
 				abort() // release
 
