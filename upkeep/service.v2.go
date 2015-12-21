@@ -87,10 +87,7 @@ func (serv *srv) keep(c ctx.Context) (err error) {
 			_, krr := serv.kAPI.Set(c, k, node.MetaData, serv.opts)
 			if krr != nil {
 				output <- err
-				serv.opts.PrevExist = etcd.PrevIgnore
 				return // break out
-			} else {
-				serv.opts.PrevExist = etcd.PrevExist
 			}
 		}
 		output <- nil // all good
@@ -100,6 +97,11 @@ func (serv *srv) keep(c ctx.Context) (err error) {
 		err = c.Err()
 	case e := <-output:
 		err = e
+	}
+	if err != nil {
+		serv.opts.PrevExist = etcd.PrevIgnore
+	} else {
+		serv.opts.PrevExist = etcd.PrevExist
 	}
 	return
 }
@@ -144,7 +146,7 @@ func Register(service *Service) {
 		service,
 		make([]string, 0),
 		etcd.NewKeysAPI(disc.NewDiscovery()),
-		&etcd.SetOptions{TTL: service.TTL},
+		&etcd.SetOptions{TTL: service.TTL, PrevExist: etcd.PrevIgnore},
 		nil,
 	}
 
