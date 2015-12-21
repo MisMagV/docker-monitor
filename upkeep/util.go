@@ -9,7 +9,7 @@ import (
 
 const (
 	DEFAULT_HEARTBEAT = 30 * time.Second
-	DEFAULT_TTL       = 35 * time.Second
+	DEFAULT_TTL       = 45 * time.Second
 
 	DEFAULT_PROBE = 5 * time.Second
 )
