@@ -86,8 +86,8 @@ func (serv *srv) keep(c ctx.Context) (err error) {
 		for _, k := range serv.key {
 			_, krr := serv.kAPI.Set(c, k, node.MetaData, serv.opts)
 			if krr != nil {
-				serv.opts.PrevExist = etcd.PrevIgnore
 				output <- err
+				serv.opts.PrevExist = etcd.PrevIgnore
 				return // break out
 			} else {
 				serv.opts.PrevExist = etcd.PrevExist
@@ -198,7 +198,7 @@ func Register(service *Service) {
 		func() {
 			d, abort := ctx.WithTimeout(wk, UpkeepTimeout)
 			if err := serv.keep(d); err != nil {
-				logger.WithFields(log.Fields{"err": err}).Error("-up")
+				logger.WithFields(log.Fields{"err": err, "state": serv.opts.PrevExist}).Error("-up")
 			} else {
 				logger.Info("+up")
 			}
@@ -209,18 +209,18 @@ func Register(service *Service) {
 		for yay := true; yay; {
 			select {
 			case <-heartbeat.C:
-				d, abort := ctx.WithTimeout(wk, UpkeepTimeout)
 				if !chk.Pass() {
 					serv.opts.PrevExist = etcd.PrevIgnore
 					logger.Error("!up")
 				} else {
+					d, abort := ctx.WithTimeout(wk, UpkeepTimeout)
 					if err := serv.keep(d); err != nil {
-						logger.WithFields(log.Fields{"err": err}).Error("-up")
+						logger.WithFields(log.Fields{"err": err, "state": serv.opts.PrevExist}).Error("-up")
 					} else {
 						logger.Info("+up")
 					}
+					abort() // release
 				}
-				abort() // release
 
 			case <-probe.C:
 				d, abort := ctx.WithTimeout(wk, ProbeTimeout)
