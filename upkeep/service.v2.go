@@ -81,22 +81,11 @@ type srv struct {
 }
 
 func (serv *srv) keep(c ctx.Context) (err error) {
-	output := make(chan error, 1)
-	go func() {
-		for _, k := range serv.key {
-			_, krr := serv.kAPI.Set(c, k, node.MetaData, serv.opts)
-			if krr != nil {
-				output <- err
-				return // break out
-			}
+	for _, k := range serv.key {
+		_, err = serv.kAPI.Set(c, k, node.MetaData, serv.opts)
+		if err != nil {
+			break
 		}
-		output <- nil // all good
-	}()
-	select {
-	case <-c.Done():
-		err = c.Err()
-	case e := <-output:
-		err = e
 	}
 	if err != nil {
 		serv.opts.PrevExist = etcd.PrevIgnore
@@ -107,22 +96,8 @@ func (serv *srv) keep(c ctx.Context) (err error) {
 }
 
 func (serv *srv) probe(c ctx.Context) (err error) {
-	output := make(chan error, 1)
-	go func() {
-		prr := serv.driver.Probe(c)
-		if err != nil {
-			output <- prr
-		} else {
-			output <- nil
-		}
-		log.WithFields(log.Fields{"err": err, "srv": serv.Srv}).Debug("probe")
-	}()
-	select {
-	case <-c.Done():
-		err = c.Err()
-	case e := <-output:
-		err = e
-	}
+	err = serv.driver.Probe(c)
+	log.WithFields(log.Fields{"err": err, "srv": serv.Srv}).Debug("probe")
 	return
 }
 
