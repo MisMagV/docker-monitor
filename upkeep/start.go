@@ -1,6 +1,8 @@
 package upkeep
 
 import (
+	push "github.com/jeffjen/go-message/push"
+
 	disc "github.com/jeffjen/go-discovery"
 	"github.com/jeffjen/go-libkv/libkv"
 
@@ -36,6 +38,10 @@ var (
 	Record = make(map[string]*RunningRecord)
 )
 
+var (
+	report push.Pusher
+)
+
 func sync(jobId int64) {
 	if err := rec.Save(DEFAULT_SYNC_PATH); err != nil {
 		log.WithFields(log.Fields{"err": err}).Warning("persist failed")
@@ -44,10 +50,11 @@ func sync(jobId int64) {
 	}
 }
 
-func Init(persist bool) {
+func Init(persist bool, pusher push.Pusher) {
 	var err error
 
 	Advertise, _, _ = net.SplitHostPort(disc.Advertise)
+	report = pusher
 
 	if persist {
 		if rec, err = libkv.Load(DEFAULT_SYNC_PATH); err != nil {

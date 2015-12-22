@@ -53,7 +53,16 @@ const (
 	MaxFailAttemps = 3
 )
 
+const (
+	ServiceUp          = "up"
+	ServiceUnavailable = "unavailable"
+	ServiceDown        = "down"
+	ServiceRemoved     = "die"
+)
+
 type Service struct {
+	State string `json:"State"`
+
 	Hb  time.Duration `json: "Heartbeat"`
 	TTL time.Duration `json: "TTL"`
 
@@ -67,6 +76,10 @@ type Service struct {
 	Net      []docker.APIPort `json: "Net"`
 	Proxy    []pxy.Info       `json: "Proxy"`
 	ProxyCfg string           `json: "ProxyCfg"`
+}
+
+func pushReport(serv *srv) {
+	report.Push(ctx.Background(), serv)
 }
 
 type srv struct {
@@ -87,10 +100,17 @@ func (serv *srv) keep(c ctx.Context) (err error) {
 			break
 		}
 	}
+	preState := serv.State
 	if err != nil {
+		serv.State = ServiceUnavailable
 		serv.opts.PrevExist = etcd.PrevIgnore
+		go pushReport(serv)
 	} else {
+		serv.State = ServiceUp
 		serv.opts.PrevExist = etcd.PrevExist
+		if preState != ServiceUp {
+			go pushReport(serv)
+		}
 	}
 	return
 }
@@ -99,6 +119,24 @@ func (serv *srv) probe(c ctx.Context) (err error) {
 	err = serv.driver.Probe(c)
 	log.WithFields(log.Fields{"err": err, "srv": serv.Srv}).Debug("probe")
 	return
+}
+
+func (serv *srv) urk() {
+	serv.State = ServiceUnavailable
+	serv.opts.PrevExist = etcd.PrevIgnore
+	go pushReport(serv)
+}
+
+func (serv *srv) down() {
+	serv.State = ServiceDown
+	serv.opts.PrevExist = etcd.PrevIgnore
+	go pushReport(serv)
+}
+
+func (serv *srv) die() {
+	serv.State = ServiceRemoved
+	serv.opts.PrevExist = etcd.PrevIgnore
+	go pushReport(serv)
 }
 
 func Get(iden string) (s *Service) {
@@ -187,7 +225,7 @@ func Register(service *Service) {
 			select {
 			case <-heartbeat.C:
 				if !chk.Pass() {
-					serv.opts.PrevExist = etcd.PrevIgnore
+					serv.urk()
 					logger.Error("!up")
 				} else {
 					d, abort := ctx.WithTimeout(wk, UpkeepTimeout)
@@ -211,6 +249,7 @@ func Register(service *Service) {
 				abort() // release
 
 			case <-wk.Done():
+				serv.down()
 				logger.Warning("down")
 				yay = false
 			}
@@ -230,7 +269,11 @@ func Unregister(iden string) {
 	if r, ok := Record[iden]; ok {
 		delete(Record, iden)
 		r.Abort()
-		rec.Del(iden)
+		go func() {
+			serv := &srv{rec.Get(iden).(*Service), nil, nil, nil, nil}
+			serv.die()
+			rec.Del(iden)
+		}()
 		log.WithFields(log.Fields{"ID": iden[:12], "srv": r.Srv}).Warning("die")
 	}
 }

@@ -4,6 +4,7 @@ import (
 	up "github.com/jeffjen/docker-monitor/upkeep"
 	disc "github.com/jeffjen/go-discovery"
 	dcli "github.com/jeffjen/go-discovery/cli"
+	scli "github.com/jeffjen/go-message/push/slack/cli"
 
 	log "github.com/Sirupsen/logrus"
 	cli "github.com/codegangsta/cli"
@@ -32,8 +33,13 @@ func Monitor(ctx *cli.Context) {
 		os.Exit(1)
 	}
 
+	if err := scli.Before(ctx); err != nil {
+		log.Error(err)
+		os.Exit(1)
+	}
+
 	// setup service upkeep
-	up.Init(ctx.Bool("persist"))
+	up.Init(ctx.Bool("persist"), scli.DefaultSlack)
 
 	if addr != "" {
 		log.WithFields(log.Fields{"addr": addr}).Info("API endpoint begin")

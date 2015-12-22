@@ -2,6 +2,7 @@ package cmd
 
 import (
 	dcli "github.com/jeffjen/go-discovery/cli"
+	scli "github.com/jeffjen/go-message/push/slack/cli"
 
 	cli "github.com/codegangsta/cli"
 )
@@ -28,6 +29,16 @@ var (
 	}
 )
 
+const (
+	AgentReportTmpl = `{"endpoint": [[{{range $i, $k := .key}}{{if $i}},"{{$k}}"{{else}}"{{$k}}"{{end}}{{end}}]], "srv": "{{.Srv}}", "state": "{{.State}}"}`
+)
+
+func init() {
+	scli.NotificationTmpl = AgentReportTmpl
+}
+
 func NewFlag() []cli.Flag {
-	return append(Flags, dcli.Flags...)
+	Flags = append(Flags, dcli.Flags...)
+	Flags = append(Flags, scli.Flags...)
+	return Flags
 }
