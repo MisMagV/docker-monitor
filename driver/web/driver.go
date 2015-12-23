@@ -4,6 +4,7 @@ import (
 	d "github.com/jeffjen/docker-monitor/driver"
 
 	"errors"
+	"fmt"
 	ctx "golang.org/x/net/context"
 	http "golang.org/x/net/context/ctxhttp"
 	"io"
@@ -22,14 +23,14 @@ type HttpProbe struct {
 func (h *HttpProbe) Probe(c ctx.Context) error {
 	resp, err := http.Get(c, nil, h.url)
 	if err != nil {
-		return err
+		return ErrNotReachable
 	} else {
 		go func() {
 			defer resp.Body.Close()
 			io.Copy(ioutil.Discard, resp.Body)
 		}()
 		if resp.StatusCode != 200 {
-			return ErrNotReachable
+			return fmt.Errorf("%d: %s", resp.StatusCode, h.url)
 		} else {
 			return nil
 		}

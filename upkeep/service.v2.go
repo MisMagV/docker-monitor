@@ -189,7 +189,7 @@ func Register(service *Service) {
 	if serv.ProbeEndpoint == "" {
 		endpoint = path.Base(serv.Key[0])
 	} else {
-		endpoint = fmt.Sprintf("%s/%s", path.Base(serv.Key[0]), serv.ProbeEndpoint)
+		endpoint = path.Join(path.Base(serv.Key[0]), serv.ProbeEndpoint)
 	}
 
 	// TODO:  setup driver for probing
