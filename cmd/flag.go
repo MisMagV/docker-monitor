@@ -5,6 +5,9 @@ import (
 	scli "github.com/jeffjen/go-message/push/slack/cli"
 
 	cli "github.com/codegangsta/cli"
+
+	"path"
+	tmpl "text/template"
 )
 
 var (
@@ -29,12 +32,18 @@ var (
 	}
 )
 
-const (
-	AgentReportTmpl = `{"endpoint": [[{{range $i, $k := .key}}{{if $i}},"{{$k}}"{{else}}"{{$k}}"{{end}}{{end}}]], "srv": "{{.Srv}}", "state": "{{.State}}"}`
-)
-
 func init() {
-	scli.NotificationTmpl = AgentReportTmpl
+	scli.NotificationTmpl = `{
+    "endpoint": [
+	    {{range $i, $k := .Key}}{{if $i}},"{{base $k}}"{{else}}"{{base $k}}"{{end}}{{end}}
+	],
+	"srv": "{{.Srv}}",
+	"state": "{{.State}}"
+}`
+
+	scli.FuncMap = tmpl.FuncMap{
+		"base": path.Base,
+	}
 }
 
 func NewFlag() []cli.Flag {

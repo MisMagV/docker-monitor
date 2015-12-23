@@ -91,6 +91,7 @@ func register(w http.ResponseWriter, r *http.Request, args []string) {
 	ProxyCfg = info.Config.Labels["proxycfg"]
 
 	up.Place(&up.Service{
+		State:         up.ServiceUp,
 		Hb:            Heartbeat,
 		TTL:           TTL,
 		PHb:           ProbeHeartbeat,

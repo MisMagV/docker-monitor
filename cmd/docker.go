@@ -102,6 +102,7 @@ func newRecord(iden string) {
 	}
 
 	up.Place(&up.Service{
+		State:         up.ServiceUp,
 		Hb:            Heartbeat,
 		TTL:           TTL,
 		PHb:           ProbeHeartbeat,

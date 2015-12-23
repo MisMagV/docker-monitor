@@ -76,16 +76,23 @@ type Service struct {
 	Net      []docker.APIPort `json: "Net"`
 	Proxy    []pxy.Info       `json: "Proxy"`
 	ProxyCfg string           `json: "ProxyCfg"`
+
+	Key []string `json: "Key"`
 }
 
 func pushReport(serv *srv) {
-	report.Push(ctx.Background(), serv)
+	pushlog := log.WithFields(log.Fields{"srv": serv.Srv, "state": serv.State})
+	go func() {
+		wk, cancel := ctx.WithTimeout(ctx.Background(), 5*time.Second)
+		defer cancel()
+		if err := report.Push(wk, serv); err != nil {
+			pushlog.WithFields(log.Fields{"err": err}).Warning("push")
+		}
+	}()
 }
 
 type srv struct {
 	*Service // embedded type
-
-	key []string
 
 	kAPI etcd.KeysAPI
 	opts *etcd.SetOptions
@@ -94,7 +101,7 @@ type srv struct {
 }
 
 func (serv *srv) keep(c ctx.Context) (err error) {
-	for _, k := range serv.key {
+	for _, k := range serv.Key {
 		_, err = serv.kAPI.Set(c, k, node.MetaData, serv.opts)
 		if err != nil {
 			break
@@ -104,12 +111,12 @@ func (serv *srv) keep(c ctx.Context) (err error) {
 	if err != nil {
 		serv.State = ServiceUnavailable
 		serv.opts.PrevExist = etcd.PrevIgnore
-		go pushReport(serv)
+		pushReport(serv)
 	} else {
 		serv.State = ServiceUp
 		serv.opts.PrevExist = etcd.PrevExist
 		if preState != ServiceUp {
-			go pushReport(serv)
+			pushReport(serv)
 		}
 	}
 	return
@@ -124,19 +131,18 @@ func (serv *srv) probe(c ctx.Context) (err error) {
 func (serv *srv) urk() {
 	serv.State = ServiceUnavailable
 	serv.opts.PrevExist = etcd.PrevIgnore
-	go pushReport(serv)
+	pushReport(serv)
 }
 
 func (serv *srv) down() {
 	serv.State = ServiceDown
 	serv.opts.PrevExist = etcd.PrevIgnore
-	go pushReport(serv)
+	pushReport(serv)
 }
 
 func (serv *srv) die() {
 	serv.State = ServiceRemoved
-	serv.opts.PrevExist = etcd.PrevIgnore
-	go pushReport(serv)
+	pushReport(serv)
 }
 
 func Get(iden string) (s *Service) {
@@ -154,10 +160,10 @@ func Place(service *Service) {
 
 func Register(service *Service) {
 	alloc := AllocHelper(service.ProbeType)
+	service.Key = make([]string, 0)
 
 	serv := &srv{
 		service,
-		make([]string, 0),
 		etcd.NewKeysAPI(disc.NewDiscovery()),
 		&etcd.SetOptions{TTL: service.TTL, PrevExist: etcd.PrevIgnore},
 		nil,
@@ -167,23 +173,23 @@ func Register(service *Service) {
 		"ID": serv.Id[:12], "srv": serv.Srv, "heartbeat": serv.Hb, "ttl": serv.TTL,
 	})
 
-	// Advertise key on the discovery service
+	// Advertise Key on the discovery service
 	if serv.Port != "" {
-		serv.key = append(serv.key, fmt.Sprintf("%s/%s:%s", serv.Srv, Advertise, serv.Port))
+		serv.Key = append(serv.Key, fmt.Sprintf("%s/%s:%s", serv.Srv, Advertise, serv.Port))
 	} else if len(serv.Net) > 0 {
-		serv.key = make([]string, 0)
+		serv.Key = make([]string, 0)
 		for _, p := range serv.Net {
 			if p.PublicPort != 0 && p.IP == "0.0.0.0" {
-				serv.key = append(serv.key, fmt.Sprintf("%s/%s:%d", serv.Srv, Advertise, p.PublicPort))
+				serv.Key = append(serv.Key, fmt.Sprintf("%s/%s:%d", serv.Srv, Advertise, p.PublicPort))
 			}
 		}
 	}
 
 	var endpoint string
 	if serv.ProbeEndpoint == "" {
-		endpoint = path.Base(serv.key[0])
+		endpoint = path.Base(serv.Key[0])
 	} else {
-		endpoint = fmt.Sprintf("%s/%s", path.Base(serv.key[0]), serv.ProbeEndpoint)
+		endpoint = fmt.Sprintf("%s/%s", path.Base(serv.Key[0]), serv.ProbeEndpoint)
 	}
 
 	// TODO:  setup driver for probing
@@ -270,7 +276,7 @@ func Unregister(iden string) {
 		delete(Record, iden)
 		r.Abort()
 		go func() {
-			serv := &srv{rec.Get(iden).(*Service), nil, nil, nil, nil}
+			serv := &srv{rec.Get(iden).(*Service), nil, nil, nil}
 			serv.die()
 			rec.Del(iden)
 		}()
