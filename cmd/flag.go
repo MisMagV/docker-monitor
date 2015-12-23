@@ -2,6 +2,7 @@ package cmd
 
 import (
 	dcli "github.com/jeffjen/go-discovery/cli"
+	node "github.com/jeffjen/go-discovery/info"
 	scli "github.com/jeffjen/go-message/push/slack/cli"
 
 	cli "github.com/codegangsta/cli"
@@ -33,16 +34,11 @@ var (
 )
 
 func init() {
-	scli.NotificationTmpl = `{
-    "endpoint": [
-	    {{range $i, $k := .Key}}{{if $i}},"{{base $k}}"{{else}}"{{base $k}}"{{end}}{{end}}
-	],
-	"srv": "{{.Srv}}",
-	"state": "{{.State}}"
-}`
+	scli.NotificationTmpl = `{"node": {{here}}, "endpoint": [{{range $i, $k := .Key}}{{if $i}},"{{base $k}}"{{else}}"{{base $k}}"{{end}}{{end}}], "srv": "{{.Srv}}", "state": "{{.State}}"}`
 
 	scli.FuncMap = tmpl.FuncMap{
 		"base": path.Base,
+		"here": func() string { return node.MetaData },
 	}
 }
 
