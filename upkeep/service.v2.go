@@ -48,7 +48,7 @@ func init() {
 const (
 	UpkeepTimeout = 3 * time.Second
 
-	ProbeTimeout = 100 * time.Millisecond
+	ProbeTimeout = 1 * time.Second
 
 	MaxFailAttemps = 3
 )
