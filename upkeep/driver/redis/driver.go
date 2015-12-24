@@ -1,7 +1,7 @@
 package redis
 
 import (
-	d "github.com/jeffjen/docker-monitor/driver"
+	d "github.com/jeffjen/docker-monitor/upkeep/driver"
 	disc "github.com/jeffjen/go-discovery"
 	node "github.com/jeffjen/go-discovery/info"
 

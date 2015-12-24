@@ -5,18 +5,34 @@ import (
 
 	log "github.com/Sirupsen/logrus"
 	docker "github.com/fsouza/go-dockerclient"
-	dri "github.com/jeffjen/docker-monitor/driver"
+	dri "github.com/jeffjen/docker-monitor/upkeep/driver"
 	disc "github.com/jeffjen/go-discovery"
 	node "github.com/jeffjen/go-discovery/info"
 
 	etcd "github.com/coreos/etcd/client"
 	ctx "golang.org/x/net/context"
 
+	"encoding/json"
 	"fmt"
 	"os"
 	"path"
 	"time"
 )
+
+var (
+	dCli *docker.Client
+)
+
+func GetDockerClient() *docker.Client {
+	if dCli == nil {
+		if d, err := docker.NewClientFromEnv(); err != nil {
+			//log.Fatal(err)
+		} else {
+			dCli = d
+		}
+	}
+	return dCli
+}
 
 func init() {
 	var level = os.Getenv("LOG_LEVEL")
@@ -265,6 +281,81 @@ func Register(service *Service) {
 	Record[serv.Id] = &RunningRecord{serv.Srv, abort} // register abort function for this service
 }
 
+func NewContainerRecord(iden string) {
+	logger := log.WithFields(log.Fields{"ID": iden[:12]})
+
+	if s := Get(iden); s != nil {
+		Register(s)
+		return
+	}
+
+	info, err := dCli.InspectContainer(iden)
+	if err != nil {
+		logger.WithFields(log.Fields{"err": err}).Warning("NewRecord")
+		return
+	}
+
+	var (
+		Srv  = info.Config.Labels["service"]
+		Net  = info.NetworkSettings.PortMappingAPI()
+		Port = info.Config.Labels["port"]
+
+		Heartbeat time.Duration
+		TTL       time.Duration
+
+		ProbeHeartbeat time.Duration
+		ProbeType      = info.Config.Labels["probe_type"]
+		ProbeEndpoint  = info.Config.Labels["probe_endpoint"]
+
+		Proxy    = make([]pxy.Info, 0)
+		ProxyCfg = info.Config.Labels["proxycfg"]
+	)
+
+	if !Validate(info.ID, Srv, Port, Net) {
+		return
+	}
+
+	if hbStr := info.Config.Labels["heartbeat"]; hbStr == "" {
+		Heartbeat = DEFAULT_HEARTBEAT
+	} else {
+		Heartbeat = ParseDuration(hbStr, DEFAULT_HEARTBEAT)
+	}
+
+	if phbStr := info.Config.Labels["probe_heartbeat"]; phbStr == "" {
+		ProbeHeartbeat = DEFAULT_PROBE
+	} else {
+		ProbeHeartbeat = ParseDuration(phbStr, DEFAULT_PROBE)
+	}
+
+	if ttlStr := info.Config.Labels["ttl"]; ttlStr == "" {
+		TTL = DEFAULT_TTL
+	} else {
+		TTL = ParseDuration(ttlStr, DEFAULT_TTL)
+	}
+
+	if proxySpec := info.Config.Labels["proxy"]; proxySpec != "" {
+		if err := json.Unmarshal([]byte(proxySpec), &Proxy); err != nil {
+			logger.WithFields(log.Fields{"err": err}).Warning("NewRecord")
+			return
+		}
+	}
+
+	Place(&Service{
+		State:         ServiceUp,
+		Hb:            Heartbeat,
+		TTL:           TTL,
+		PHb:           ProbeHeartbeat,
+		ProbeType:     ProbeType,
+		ProbeEndpoint: ProbeEndpoint,
+		Id:            info.ID,
+		Srv:           Srv,
+		Port:          Port,
+		Net:           Net,
+		Proxy:         Proxy,
+		ProxyCfg:      ProxyCfg,
+	})
+}
+
 func Suspend(iden string) {
 	if r, ok := Record[iden]; ok {
 		r.Abort()
@@ -272,6 +363,8 @@ func Suspend(iden string) {
 }
 
 func Unregister(iden string) {
+	logger := log.WithFields(log.Fields{"ID": iden[:12]})
+
 	if r, ok := Record[iden]; ok {
 		delete(Record, iden)
 		r.Abort()
@@ -280,6 +373,6 @@ func Unregister(iden string) {
 			serv.die()
 			rec.Del(iden)
 		}()
-		log.WithFields(log.Fields{"ID": iden[:12], "srv": r.Srv}).Warning("die")
+		logger.WithFields(log.Fields{"srv": r.Srv}).Warning("die")
 	}
 }

@@ -1,7 +1,7 @@
 package web
 
 import (
-	d "github.com/jeffjen/docker-monitor/driver"
+	d "github.com/jeffjen/docker-monitor/upkeep/driver"
 
 	"errors"
 	"fmt"

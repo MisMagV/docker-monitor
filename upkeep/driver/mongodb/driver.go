@@ -1,7 +1,7 @@
 package mongodb
 
 import (
-	d "github.com/jeffjen/docker-monitor/driver"
+	d "github.com/jeffjen/docker-monitor/upkeep/driver"
 
 	ctx "golang.org/x/net/context"
 	"gopkg.in/mgo.v2"

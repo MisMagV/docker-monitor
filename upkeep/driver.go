@@ -1,10 +1,10 @@
 package upkeep
 
 import (
-	dri "github.com/jeffjen/docker-monitor/driver"
-	mgo "github.com/jeffjen/docker-monitor/driver/mongodb"
-	redis "github.com/jeffjen/docker-monitor/driver/redis"
-	web "github.com/jeffjen/docker-monitor/driver/web"
+	dri "github.com/jeffjen/docker-monitor/upkeep/driver"
+	mgo "github.com/jeffjen/docker-monitor/upkeep/driver/mongodb"
+	redis "github.com/jeffjen/docker-monitor/upkeep/driver/redis"
+	web "github.com/jeffjen/docker-monitor/upkeep/driver/web"
 
 	log "github.com/Sirupsen/logrus"
 
