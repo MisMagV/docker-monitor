@@ -50,24 +50,33 @@ func sync(jobId int64) {
 	}
 }
 
-func Init(persist bool, pusher push.Pusher) {
-	var err error
+func Init(persist bool, pub push.Pusher) {
+	cli := GetDockerClient()
 
+	// setup service state change publisher
+	report = pub
+
+	// Advertise host URI
 	Advertise, _, _ = net.SplitHostPort(disc.Advertise)
-	report = pusher
 
 	if persist {
-		if rec, err = libkv.Load(DEFAULT_SYNC_PATH); err != nil {
+		if r, err := libkv.Load(DEFAULT_SYNC_PATH); err != nil {
 			log.WithFields(log.Fields{"err": err}).Warning("load failed")
-		}
-		for k := range rec.IterateR() {
-			service, ok := k.X.(*Service)
-			if ok {
-				Register(service)
-			}
+			rec = libkv.NewStore()
+		} else {
+			rec = r
 		}
 	} else {
 		rec = libkv.NewStore()
+	}
+
+	containers, err := cli.ListContainers(docker.ListContainersOptions{All: true})
+	if err != nil {
+		log.WithFields(log.Fields{"err": err}).Warning(err)
+		return
+	}
+	for _, c := range containers {
+		NewContainerRecord(c.ID)
 	}
 }
 

@@ -294,6 +294,10 @@ func NewContainerRecord(iden string) {
 		logger.WithFields(log.Fields{"err": err}).Warning("NewRecord")
 		return
 	}
+	if !info.State.Running {
+		logger.WithFields(log.Fields{"err": "not running"}).Warning("NewRecord")
+		return
+	}
 
 	var (
 		Srv  = info.Config.Labels["service"]
