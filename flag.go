@@ -9,6 +9,7 @@ import (
 
 	"path"
 	tmpl "text/template"
+	"time"
 )
 
 var (
@@ -34,11 +35,12 @@ var (
 )
 
 func init() {
-	scli.NotificationTmpl = `{"node": {{here}}, "endpoint": [{{range $i, $k := .Key}}{{if $i}},"{{base $k}}"{{else}}"{{base $k}}"{{end}}{{end}}], "srv": "{{.Srv}}", "state": "{{.State}}"}`
+	scli.NotificationTmpl = `{"timestamp": "{{now}}", "node": {{here}}, "endpoint": [{{range $i, $k := .Key}}{{if $i}},"{{base $k}}"{{else}}"{{base $k}}"{{end}}{{end}}], "srv": "{{.Srv}}", "state": "{{.State}}"}`
 
 	scli.FuncMap = tmpl.FuncMap{
 		"base": path.Base,
 		"here": func() string { return node.MetaData },
+		"now":  func() string { return time.Now().String() },
 	}
 }
 
