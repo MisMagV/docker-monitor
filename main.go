@@ -43,8 +43,11 @@ func Monitor(ctx *cli.Context) {
 	disc.RegisterPath = path.Join(ctx.String("cluster"), DiscoveryPath)
 
 	if err := dcli.Before(ctx); err != nil {
-		log.Error(err)
-		os.Exit(1)
+		if err == dcli.ErrRequireDiscovery {
+			log.WithFields(log.Fields{"err": err}).Warning("discovery feature disabled")
+		} else {
+			log.WithFields(log.Fields{"err": err}).Fatal("halt")
+		}
 	}
 
 	if err := scli.Before(ctx); err != nil {
