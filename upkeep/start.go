@@ -12,6 +12,7 @@ import (
 
 	"encoding/gob"
 	"net"
+	"reflect"
 	"time"
 )
 
@@ -54,7 +55,12 @@ func Init(persist bool, pub push.Pusher) {
 	cli := GetDockerClient()
 
 	// setup service state change publisher
-	report = pub
+	if v := reflect.ValueOf(pub); !v.IsValid() || v.IsNil() {
+		log.Warning("not publishing service status")
+		report = &push.NullPusher{}
+	} else {
+		report = pub
+	}
 
 	// Advertise host URI
 	Advertise, _, _ = net.SplitHostPort(disc.Advertise)
